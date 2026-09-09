@@ -9,6 +9,8 @@ import datetime as dt
 import os
 import time
 
+from .config import not_my_work
+
 # 进年鉴的东西：你做出来的成品。
 # 刻意不收 .jar/.exe/.dll —— gradle-wrapper.jar 和 node.exe 不是你的作品；
 # .apk 收，因为那是你自己编出来的（专注锁就是这么来的）。
@@ -51,30 +53,11 @@ def activity(con, months: int = 24) -> list:
     return out
 
 
-# 这些地方装的是「你收到的」，不是「你做的」：微信/QQ 的文件缓存、
-# 网盘下载目录、浏览器下载。年鉴要回答「你做了什么」，把它们算进去
-# 就变成了「你今年收了多少份文件」，那没有意义。
-RECEIVED_SEGMENTS = {
-    "xwechat_files", "wechat files", "wechatfiles", "tencent files",
-    "tencentfiles", "qq files", "baidunetdiskdownload", "baidunetdisktmp",
-    "downloads", "download", "迅雷下载", "接收的文件", "我的下载",
-    # 原始素材不是成品：拍回来的片段、录屏、导出前的中间件
-    "素材", "剪辑素材", "原素材", "raw", "footage", "录屏", "缓存", "cache",
-}
-
-
-def _is_received(path: str) -> bool:
-    parts = [p.lower() for p in path.replace("/", "\\").split("\\")]
-    return any(p in RECEIVED_SEGMENTS for p in parts)
-
-
 def _artifacts(con, start: float, end: float, limit: int = 400) -> tuple:
     """一年里做出来的成品。返回 (列表, 去重后的真实总数)。
 
     同一份东西在三个文件夹里躺着只算一次；别人发来的、下载来的不算。
     """
-    from .projects import _third_party
-
     rows = con.execute(
         "SELECT id, name, path, kind, ext, size, mtime, text_len, fp FROM files "
         "WHERE mtime>=? AND mtime<? AND " + ARTIFACT_SQL +
@@ -86,7 +69,7 @@ def _artifacts(con, start: float, end: float, limit: int = 400) -> tuple:
     total = 0
     words = 0
     for r in rows:
-        if _third_party(r["path"]) or _is_received(r["path"]):
+        if not_my_work(r["path"]):
             continue
         fp = r["fp"]
         if fp and fp in seen_fp:

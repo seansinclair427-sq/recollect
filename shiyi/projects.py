@@ -11,7 +11,7 @@ import os
 import re
 import time
 
-from .config import Config
+from .config import Config, is_third_party, not_my_work
 
 # 目录里出现这些文件 => 是个代码项目
 MARKERS = {
@@ -274,11 +274,6 @@ def _like_prefix(path: str) -> str:
 
 
 # ----------------------------------------------------------------- 版本簇
-# 别人的东西：模组、启动器、依赖包。它们「多份」是正常的，不是你的堆积。
-THIRD_PARTY_SEGMENTS = {
-    "mods", "libraries", "versions", ".minecraft", "pcl2", "resourcepacks",
-    "shaderpacks", "node", "runtime", "jre", "jdk", "plugins", "site-packages",
-}
 # 参与聚簇的文件类别：只看你自己产出的东西
 CLUSTER_KINDS = ("doc", "slide", "sheet", "pdf", "archive")
 MIN_SLUG = 3
@@ -287,6 +282,7 @@ GENERIC_SLUGS = {
     "readme", "index", "main", "app", "config", "settings", "package",
     "public", "client", "server", "src", "files", "file", "assets", "static",
     "images", "image", "img", "css", "js", "lib", "libs", "docs", "doc",
+    "documentation", "manual", "guide", "help", "info",
     "test", "tests", "example", "examples", "demo", "output", "outputs",
     "input", "inputs", "log", "logs", "notes", "note", "todo", "license",
     "changelog", "makefile", "requirements", "styles", "style", "utils",
@@ -297,10 +293,7 @@ GENERIC_SLUGS = {
 
 
 def _third_party(path: str) -> bool:
-    parts = [p.lower() for p in path.replace("/", "\\").split("\\")]
-    if any(p in THIRD_PARTY_SEGMENTS for p in parts):
-        return True
-    return any(p.endswith(("-main", "-master")) for p in parts)
+    return is_third_party(path)
 
 
 def _slug_ok(s: str) -> bool:
@@ -321,7 +314,7 @@ def clusters(con, min_members: int = 2) -> list:
     for r in con.execute(
         "SELECT id, path, name, slug, version, file_count, size, mtime, kinds FROM projects"
     ):
-        if _third_party(r["path"]) or not _slug_ok(r["slug"]):
+        if not_my_work(r["path"]) or not _slug_ok(r["slug"]):
             continue
         buckets.setdefault(("dir", r["slug"]), []).append({
             "type": "project", "id": r["id"], "path": r["path"], "name": r["name"],
@@ -334,7 +327,7 @@ def clusters(con, min_members: int = 2) -> list:
         "SELECT id, path, name, ext, size, mtime, kind FROM files WHERE kind IN (%s)" % ph,
         CLUSTER_KINDS,
     ):
-        if _third_party(r["path"]):
+        if not_my_work(r["path"]):
             continue
         stem = os.path.splitext(r["name"])[0]
         s = slugify(stem)
@@ -379,20 +372,32 @@ def clusters(con, min_members: int = 2) -> list:
 
 def duplicates(con, limit: int = 200) -> list:
     """正文完全相同、但文件名/位置不同的文件。"""
+    # 先多取一些再筛：排在前面的往往整组都在微信缓存里，
+    # 若按 limit 截断后再过滤，真正属于你的重复会被挤掉。
     rows = con.execute(
         "SELECT fp, count(*) c, sum(size) s FROM files"
         " WHERE fp <> '' AND fp IS NOT NULL AND text_len > 200"
-        " GROUP BY fp HAVING c > 1 ORDER BY s DESC LIMIT ?", (limit,)
+        " GROUP BY fp HAVING c > 1 ORDER BY s DESC LIMIT ?", (max(limit * 20, 2000),)
     ).fetchall()
     out = []
     for r in rows:
         members = [dict(m) for m in con.execute(
             "SELECT id, path, name, size, mtime, kind, text_len FROM files"
             " WHERE fp=? ORDER BY mtime DESC", (r["fp"],))]
-        if len({m["name"] for m in members}) == 1 and len(members) < 3:
-            kind = "同名副本"
+        # 整组都在微信缓存 / 下载目录里，那是软件行为，不是你的重复。
+        # 但只要有一份在你自己的文件夹，这组就值得看——「同一个 PPT
+        # 在项目里、OneDrive 里、微信里各躺一份」正是要指出来的事。
+        mine = [m for m in members if not not_my_work(m["path"])]
+        if not mine:
+            continue
+        for m in members:
+            m["mine"] = not not_my_work(m["path"])
+        if len({m["name"] for m in members}) == 1:
+            label = "同名副本"
         else:
-            kind = "改名副本"
+            label = "改名副本"
         out.append({"fp": r["fp"], "count": r["c"], "bytes": r["s"],
-                    "label": kind, "members": members})
+                    "label": label, "own": len(mine), "members": members})
+        if len(out) >= limit:
+            break
     return out

@@ -117,8 +117,49 @@ def looks_minified(text: str) -> bool:
         return False
     lines = head.count("\n") + 1
     return len(head) / lines > 400
+
+
 # 「作品」——用户产出物，进年鉴
 ARTIFACT_KINDS = {"doc", "slide", "sheet", "pdf", "app", "image", "video"}
+
+
+# ---------------------------------------------------------------- 「谁做的」
+# 第三方的东西：模组、启动器、依赖、别人的代码树
+THIRD_PARTY_SEGMENTS = {
+    "mods", "libraries", "versions", ".minecraft", "pcl2", "resourcepacks",
+    "shaderpacks", "node", "runtime", "jre", "jdk", "plugins", "site-packages",
+    "mingw32", "mingw64", "portablegit", "toolchain", "sdk", "ndk",
+}
+# 你收到的、不是你做的：聊天软件缓存、网盘、浏览器下载、原始素材
+RECEIVED_SEGMENTS = {
+    "xwechat_files", "wechat files", "wechatfiles", "tencent files",
+    "tencentfiles", "qq files", "baidunetdiskdownload", "baidunetdisktmp",
+    "downloads", "download", "迅雷下载", "接收的文件", "我的下载",
+    "素材", "剪辑素材", "原素材", "raw", "footage", "录屏", "缓存", "cache",
+}
+
+
+def _segments(path: str) -> list:
+    return [p.lower() for p in path.replace("/", "\\").split("\\")]
+
+
+def is_third_party(path: str) -> bool:
+    segs = _segments(path)
+    return (any(s in THIRD_PARTY_SEGMENTS for s in segs)
+            or any(s.endswith(("-main", "-master")) for s in segs))
+
+
+def is_received(path: str) -> bool:
+    return any(s in RECEIVED_SEGMENTS for s in _segments(path))
+
+
+def not_my_work(path: str) -> bool:
+    """别人的东西，或者你只是收到 / 下载的东西。
+
+    「整理」和「年鉴」都只该看你自己做的：钢铁雄心模组里 38 个同名
+    documentation.md 不是你存了 38 版，微信缓存里 20 份课程表也不是。
+    """
+    return is_third_party(path) or is_received(path)
 
 
 def kind_of(path: str) -> str:

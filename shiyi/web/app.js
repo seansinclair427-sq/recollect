@@ -259,7 +259,7 @@ async function loadTidy() {
                 dups.reduce((a, g) => a + g.bytes - (g.bytes / g.count), 0);
   $('#tidySummary').innerHTML = `
     <div><b>${clusters.length}</b><span>组版本堆积</span></div>
-    <div><b>${dups.length}</b><span>组内容重复</span></div>
+    <div><b>${dups.length}${dups.length >= 120 ? '+' : ''}</b><span>组内容重复</span></div>
     <div><b>${size(waste)}</b><span>只留一份可省下</span></div>`;
   renderTidy();
 }
@@ -294,10 +294,11 @@ function renderTidy() {
           <h4>${esc(g.members[0].name)}</h4>
           <span class="badge">${esc(g.label)} ${g.count} 份</span>
           <span class="badge q">${size(g.bytes)}</span>
+          <span class="badge q">你的目录里 ${g.own} 份</span>
         </div>
-        <div class="grp-b">${g.members.map((m, k) => `
-          <div class="mem ${k === 0 ? 'keep' : ''}">
-            <span class="v">${k === 0 ? '' : ''}</span>
+        <div class="grp-b">${g.members.map(m => `
+          <div class="mem">
+            <span class="v">${m.mine ? '你的' : '收到'}</span>
             <span class="p" data-p="${esc(m.path)}">${esc(m.path)}</span>
             <span class="s">${when(m.mtime)}</span>
           </div>`).join('')}</div>
