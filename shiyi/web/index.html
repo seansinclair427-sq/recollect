@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN" data-token="__SHIYI_TOKEN__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拾遗</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23b4451f'/><text x='16' y='23' font-size='19' text-anchor='middle' fill='%23fff' font-family='serif'>拾</text></svg>">
+</head>
+<body>
+
+<aside class="rail">
+  <div class="brand">
+    <span class="seal">拾</span>
+    <div>
+      <b>拾遗</b>
+      <small>本地作品档案馆</small>
+    </div>
+  </div>
+
+  <nav class="tabs">
+    <button data-view="search"  class="on"><i data-i="search"></i>检索</button>
+    <button data-view="projects"><i data-i="grid"></i>项目</button>
+    <button data-view="tidy"><i data-i="stack"></i>整理</button>
+    <button data-view="year"><i data-i="clock"></i>年鉴</button>
+  </nav>
+
+  <div class="rail-foot">
+    <div id="railStats" class="rail-stats"></div>
+    <button id="btnScan" class="scan-btn">重新扫描</button>
+    <button id="btnSettings" class="scan-btn ghost">设置</button>
+    <div id="scanBar" class="scan hidden"><div class="scan-fill"></div><span></span></div>
+  </div>
+</aside>
+
+<main>
+  <!-- ───────────────────────────── 检索 ───────────────────────────── -->
+  <section id="view-search" class="view on">
+    <div class="searchbar">
+      <i data-i="search" class="sb-icon"></i>
+      <input id="q" type="search" placeholder="搜你写过的任何一句话…" autocomplete="off" spellcheck="false" autofocus>
+      <kbd id="qhint">/</kbd>
+    </div>
+
+    <div class="filters" id="kindFilters"></div>
+
+    <div class="meta-line"><span id="resultMeta"></span><span id="modeTag" class="mode"></span></div>
+
+    <div class="split">
+      <ol id="results" class="results" tabindex="0"></ol>
+      <div id="detail" class="detail"></div>
+    </div>
+  </section>
+
+  <!-- ───────────────────────────── 项目 ───────────────────────────── -->
+  <section id="view-projects" class="view">
+    <header class="vh">
+      <h1>项目</h1>
+      <p>从散落的目录里认出来的东西。按最近改动排序。</p>
+      <input id="pq" class="mini-search" type="search" placeholder="过滤…">
+    </header>
+    <div id="projectGrid" class="pgrid"></div>
+  </section>
+
+  <!-- ───────────────────────────── 整理 ───────────────────────────── -->
+  <section id="view-tidy" class="view">
+    <header class="vh">
+      <h1>整理</h1>
+      <p>同一件东西的多个版本，和改了名字但内容一样的文件。</p>
+    </header>
+    <div id="tidySummary" class="tsum"></div>
+    <div class="tidy-tabs">
+      <button data-t="clusters" class="on">版本堆积</button>
+      <button data-t="dups">内容重复</button>
+      <button data-t="stale">很久没碰</button>
+    </div>
+    <div id="tidyBody" class="tidy-body"></div>
+  </section>
+
+  <!-- ───────────────────────────── 年鉴 ───────────────────────────── -->
+  <section id="view-year" class="view">
+    <header class="vh">
+      <h1>年鉴</h1>
+      <p>把文件翻译成「你做过什么」。</p>
+    </header>
+    <div id="yearPick" class="year-pick"></div>
+    <div id="yearBody"></div>
+  </section>
+</main>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <h2>扫描哪些地方</h2>
+    <p class="modal-sub">拾遗只读不写，从不改动你的任何文件。</p>
+    <ul id="rootList" class="root-list"></ul>
+    <div class="root-add">
+      <input id="newRoot" type="text" placeholder="粘贴一个文件夹路径，例如 D:\课程" spellcheck="false">
+      <button id="addRoot">添加</button>
+    </div>
+    <label class="opt"><input type="checkbox" id="optContent" checked>
+      <span>索引文件正文（关掉只按文件名搜，索引会小很多）</span></label>
+    <div class="modal-acts">
+      <button id="cancelCfg">取消</button>
+      <button id="saveCfg" class="primary">保存并重新扫描</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

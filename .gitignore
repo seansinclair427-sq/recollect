@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.testdata/
+*.db
+*.db-wal
+*.db-shm
+_preview.html
+.DS_Store
+Thumbs.db
