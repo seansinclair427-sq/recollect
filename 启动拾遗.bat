@@ -4,9 +4,15 @@ title 拾遗
 
 cd /d "%~dp0"
 
+rem 已经打包成 exe 就直接用 exe
+if exist "dist\拾遗\拾遗.exe" (
+  start "" "dist\拾遗\拾遗.exe"
+  exit /b 0
+)
+
 set "PY="
-where python >nul 2>nul && set "PY=python"
-if not defined PY where py >nul 2>nul && set "PY=py"
+where pythonw >nul 2>nul && set "PY=pythonw"
+if not defined PY where python >nul 2>nul && set "PY=python"
 if not defined PY (
   echo.
   echo   没找到 Python。
@@ -17,15 +23,5 @@ if not defined PY (
   exit /b 1
 )
 
-echo.
-echo   拾遗正在启动，浏览器会自动打开。
-echo   关掉这个窗口就停止。
-echo.
-
-%PY% -X utf8 -m shiyi serve
-if errorlevel 1 (
-  echo.
-  echo   启动失败。把上面的报错发出来就能查。
-  echo.
-  pause
-)
+start "" %PY% -X utf8 -m shiyi
+exit /b 0

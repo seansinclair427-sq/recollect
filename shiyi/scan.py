@@ -12,8 +12,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 from .config import (Config, IGNORE_FILE_NAMES, IGNORE_FILE_PREFIXES,
-                     MAX_DIR_TEXT_BYTES, TEXTUAL_KINDS, kind_of,
-                     looks_minified, skip_content)
+                     IGNORE_FILE_SUFFIXES, MAX_DIR_TEXT_BYTES, TEXTUAL_KINDS,
+                     kind_of, looks_minified, skip_content)
 from . import store, textract
 
 WORKERS = 8
@@ -83,7 +83,9 @@ def enumerate_files(cfg: Config, progress: Progress | None = None):
                         if not e.is_file(follow_symlinks=False):
                             continue
                         n = e.name
-                        if n in IGNORE_FILE_NAMES or n.startswith(IGNORE_FILE_PREFIXES):
+                        if (n in IGNORE_FILE_NAMES
+                                or n.startswith(IGNORE_FILE_PREFIXES)
+                                or n.lower().endswith(IGNORE_FILE_SUFFIXES)):
                             continue
                         st = e.stat()
                         if st.st_size > cfg.max_file_bytes:

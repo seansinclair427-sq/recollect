@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN" data-token="__SHIYI_TOKEN__">
+<html lang="zh-CN" data-token="__SHIYI_TOKEN__" data-version="__SHIYI_VERSION__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>拾遗</title>
 <link rel="stylesheet" href="/app.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23b4451f'/><text x='16' y='23' font-size='19' text-anchor='middle' fill='%23fff' font-family='serif'>拾</text></svg>">
+<link rel="icon" href="/icon.ico">
 </head>
 <body>
 
@@ -19,17 +19,20 @@
   </div>
 
   <nav class="tabs">
-    <button data-view="search"  class="on"><i data-i="search"></i>检索</button>
-    <button data-view="projects"><i data-i="grid"></i>项目</button>
-    <button data-view="tidy"><i data-i="stack"></i>整理</button>
-    <button data-view="year"><i data-i="clock"></i>年鉴</button>
+    <button data-view="search"  class="on"><i data-i="search"></i><span>检索</span></button>
+    <button data-view="projects"><i data-i="grid"></i><span>项目</span></button>
+    <button data-view="tidy"><i data-i="stack"></i><span>整理</span></button>
+    <button data-view="year"><i data-i="clock"></i><span>年鉴</span></button>
   </nav>
 
   <div class="rail-foot">
     <div id="railStats" class="rail-stats"></div>
-    <button id="btnScan" class="scan-btn">重新扫描</button>
-    <button id="btnSettings" class="scan-btn ghost">设置</button>
     <div id="scanBar" class="scan hidden"><div class="scan-fill"></div><span></span></div>
+    <button id="btnScan" class="scan-btn">重新扫描</button>
+    <nav class="tabs sub">
+      <button data-view="settings"><i data-i="gear"></i><span>设置</span></button>
+      <button data-view="about"><i data-i="info"></i><span>关于</span></button>
+    </nav>
   </div>
 </aside>
 
@@ -39,15 +42,32 @@
     <div class="searchbar">
       <i data-i="search" class="sb-icon"></i>
       <input id="q" type="search" placeholder="搜你写过的任何一句话…" autocomplete="off" spellcheck="false" autofocus>
-      <kbd id="qhint">/</kbd>
+      <button id="qclear" class="qclear hidden" title="清空">×</button>
+      <kbd>/</kbd>
     </div>
 
     <div class="filters" id="kindFilters"></div>
 
-    <div class="meta-line"><span id="resultMeta"></span><span id="modeTag" class="mode"></span></div>
+    <div class="meta-line">
+      <span id="resultMeta"></span>
+      <span id="modeTag" class="mode"></span>
+      <span class="grow"></span>
+      <label class="sortwrap">排序
+        <select id="sort">
+          <option value="relevance">相关</option>
+          <option value="new">最近改动</option>
+          <option value="old">最早</option>
+          <option value="big">最大</option>
+        </select>
+      </label>
+      <button id="btnExportSearch" class="mini-btn" title="把结果导出到桌面">导出结果</button>
+    </div>
 
     <div class="split">
-      <ol id="results" class="results" tabindex="0"></ol>
+      <div class="results-wrap">
+        <ol id="results" class="results" tabindex="0"></ol>
+        <div id="more" class="more hidden"><button>加载更多</button></div>
+      </div>
       <div id="detail" class="detail"></div>
     </div>
   </section>
@@ -56,7 +76,7 @@
   <section id="view-projects" class="view">
     <header class="vh">
       <h1>项目</h1>
-      <p>从散落的目录里认出来的东西。按最近改动排序。</p>
+      <p>从散落的目录里认出来的东西。你亲手做的排在前面，解压和安装出来的沉底。</p>
       <input id="pq" class="mini-search" type="search" placeholder="过滤…">
     </header>
     <div id="projectGrid" class="pgrid"></div>
@@ -86,22 +106,189 @@
     <div id="yearPick" class="year-pick"></div>
     <div id="yearBody"></div>
   </section>
+
+  <!-- ───────────────────────────── 设置 ───────────────────────────── -->
+  <section id="view-settings" class="view">
+    <header class="vh">
+      <h1>设置</h1>
+      <p>拾遗只读不写，从不改动你的任何文件。</p>
+    </header>
+    <div class="panel">
+      <section class="card">
+        <h2>扫描哪些地方</h2>
+        <p class="hint">拾遗会走遍这些目录，跳过 node_modules、.git、AppData 之类的地方。</p>
+        <ul id="rootList" class="root-list"></ul>
+        <div class="row">
+          <input id="newRoot" type="text" placeholder="粘贴一个文件夹路径，例如 D:\课程" spellcheck="false">
+          <button id="addRoot" class="btn">添加</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>额外排除</h2>
+        <p class="hint">写目录名（不是完整路径），命中就整棵跳过。一行一个。</p>
+        <ul id="ignoreList" class="chip-list"></ul>
+        <div class="row">
+          <input id="newIgnore" type="text" placeholder="例如 备份 或 obsidian-vault" spellcheck="false">
+          <button id="addIgnore" class="btn">添加</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>索引</h2>
+        <label class="opt"><input type="checkbox" id="optContent">
+          <span><b>索引文件正文</b><i>关掉就只能按文件名搜，索引会小很多，扫描也快很多。</i></span></label>
+        <label class="field">单个文件最多读取
+          <select id="optMaxText">
+            <option value="100000">10 万字</option>
+            <option value="400000">40 万字（默认）</option>
+            <option value="1000000">100 万字</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>自动扫描</h2>
+        <label class="opt"><input type="checkbox" id="optScanStart">
+          <span><b>启动时扫描一次</b><i>只处理变动过的文件，通常几秒钟。</i></span></label>
+        <label class="field">之后每隔
+          <select id="optInterval">
+            <option value="0">不自动扫描</option>
+            <option value="15">15 分钟</option>
+            <option value="30">30 分钟</option>
+            <option value="60">1 小时（默认）</option>
+            <option value="180">3 小时</option>
+            <option value="720">12 小时</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card">
+        <h2>外观</h2>
+        <div class="seg" id="themeSeg">
+          <button data-theme="auto">跟随系统</button>
+          <button data-theme="light">浅色</button>
+          <button data-theme="dark">深色</button>
+        </div>
+      </section>
+
+      <section class="card" id="systemCard">
+        <h2>系统</h2>
+        <label class="opt"><input type="checkbox" id="optAutostart">
+          <span><b>开机自动启动</b><i>安静地待在托盘里，随时可搜。</i></span></label>
+        <label class="opt"><input type="checkbox" id="optOpenWindow">
+          <span><b>启动时打开窗口</b><i>关掉就只在托盘出现，点托盘图标再打开。</i></span></label>
+        <div class="row wrap">
+          <button id="btnShortcut" class="btn">创建桌面和开始菜单快捷方式</button>
+        </div>
+      </section>
+    </div>
+
+    <footer class="savebar">
+      <span id="saveHint" class="hint"></span>
+      <button id="btnRevert" class="btn">放弃修改</button>
+      <button id="btnSave" class="btn primary">保存</button>
+    </footer>
+  </section>
+
+  <!-- ───────────────────────────── 关于 ───────────────────────────── -->
+  <section id="view-about" class="view">
+    <header class="vh">
+      <h1>关于</h1>
+      <p>版本、数据位置、索引状况，出问题时先看这里。</p>
+    </header>
+    <div class="panel">
+      <section class="card hero">
+        <span class="seal big">拾</span>
+        <div>
+          <h2 class="prod">拾遗 <span id="verTag" class="ver"></span></h2>
+          <p class="hint">把散落在硬盘里的每一件东西找回来。<br>
+             零依赖、不联网、只读不写。</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>运行环境</h2>
+        <dl id="envList" class="kv"></dl>
+      </section>
+
+      <section class="card">
+        <h2>索引</h2>
+        <div id="healthBox" class="health"></div>
+        <div class="row wrap">
+          <button class="btn" data-maint="check">体检</button>
+          <button class="btn" data-maint="vacuum">整理碎片</button>
+          <button class="btn" data-maint="rebuild">重建索引</button>
+          <button class="btn danger" data-maint="reset">清空索引</button>
+        </div>
+        <p class="hint">重建会重新读一遍所有文件；清空只删索引，你的原文件一个字节都不会动。</p>
+      </section>
+
+      <section class="card">
+        <h2>快捷键</h2>
+        <dl class="kv keys">
+          <dt><kbd>/</kbd></dt><dd>跳到搜索框</dd>
+          <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>在结果里移动</dd>
+          <dt><kbd>Enter</kbd></dt><dd>用默认程序打开</dd>
+          <dt><kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>在文件夹中显示</dd>
+          <dt><kbd>Esc</kbd></dt><dd>清空搜索</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>1..4</kbd></dt><dd>切换页面</dd>
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>日志</h2>
+        <div class="row wrap">
+          <button id="btnLoadLog" class="btn">读取最近日志</button>
+          <button id="btnOpenLog" class="btn">在文件夹中显示</button>
+        </div>
+        <pre id="logBox" class="logbox hidden"></pre>
+      </section>
+
+      <section class="card">
+        <h2>退出与卸载</h2>
+        <div class="row wrap">
+          <button id="btnQuit" class="btn">退出拾遗</button>
+          <button id="btnUninstall" class="btn danger">卸载</button>
+        </div>
+        <p class="hint">卸载会删掉快捷方式和开机自启，并询问是否一并删除索引。
+          程序文件本身在 <code id="whereCode"></code>，删掉那个文件夹就彻底没了。</p>
+      </section>
+    </div>
+  </section>
 </main>
 
-<div id="modal" class="modal hidden">
-  <div class="modal-box">
-    <h2>扫描哪些地方</h2>
-    <p class="modal-sub">拾遗只读不写，从不改动你的任何文件。</p>
-    <ul id="rootList" class="root-list"></ul>
-    <div class="root-add">
-      <input id="newRoot" type="text" placeholder="粘贴一个文件夹路径，例如 D:\课程" spellcheck="false">
-      <button id="addRoot">添加</button>
+<!-- ───────────────────────────── 首次引导 ───────────────────────────── -->
+<div id="firstrun" class="overlay hidden">
+  <div class="wizard">
+    <span class="seal big">拾</span>
+    <h1>欢迎使用拾遗</h1>
+    <p class="lead">它会把你写过的文档、幻灯、表格、PDF 和代码读进一个本地索引，
+       之后你用一句话就能找回来——不是找文件名，是找你当时写下的那句话。</p>
+    <ul class="promises">
+      <li>只读你的文件，从不修改、移动或删除</li>
+      <li>不联网、不上传、不需要账号</li>
+      <li>索引存在本机，删掉就等于卸载</li>
+    </ul>
+    <div class="wiz-roots">
+      <h3>先确认要扫描的地方</h3>
+      <ul id="wizRootList" class="root-list"></ul>
     </div>
-    <label class="opt"><input type="checkbox" id="optContent" checked>
-      <span>索引文件正文（关掉只按文件名搜，索引会小很多）</span></label>
+    <div class="wiz-acts">
+      <button id="wizSkip" class="btn">以后再说</button>
+      <button id="wizStart" class="btn primary">开始扫描</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal" class="overlay hidden">
+  <div class="modal-box">
+    <h2 id="mTitle"></h2>
+    <p id="mBody" class="hint"></p>
+    <div id="mExtra"></div>
     <div class="modal-acts">
-      <button id="cancelCfg">取消</button>
-      <button id="saveCfg" class="primary">保存并重新扫描</button>
+      <button id="mCancel" class="btn">取消</button>
+      <button id="mOk" class="btn primary">确定</button>
     </div>
   </div>
 </div>

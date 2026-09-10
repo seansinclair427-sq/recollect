@@ -249,3 +249,72 @@ def stats(con) -> dict:
     d["last_scan"] = float(get_meta(con, "last_scan", 0) or 0)
     d["scan_seconds"] = float(get_meta(con, "scan_seconds", 0) or 0)
     return d
+
+
+# ----------------------------------------------------------------- 维护
+def health(con, deep: bool = False) -> dict:
+    """索引体检：能不能用、有多大、有没有对不上的行。
+
+    deep=True 才跑 SQLite 的完整性自检——那在 400MB 的库上要好几秒，
+    不该在每次打开「关于」页时都做一遍。
+    """
+    out = {"ok": True, "problems": [], "deep": deep}
+    if deep:
+        try:
+            r = con.execute("PRAGMA quick_check(1)").fetchone()
+            if r and r[0] != "ok":
+                out["ok"] = False
+                out["problems"].append("数据库自检未通过：%s" % r[0])
+        except sqlite3.DatabaseError as exc:
+            out["ok"] = False
+            out["problems"].append("数据库打不开：%s" % exc)
+            return out
+
+    n_files = con.execute("SELECT count(*) c FROM files").fetchone()["c"]
+    n_fts = con.execute("SELECT count(*) c FROM files_fts").fetchone()["c"]
+    out["files"] = n_files
+    out["fts_rows"] = n_fts
+    if n_files != n_fts:
+        out["ok"] = False
+        out["problems"].append("正文索引有 %d 行对不上文件表" % abs(n_files - n_fts))
+
+    missing = con.execute(
+        "SELECT count(*) c FROM files f"
+        " WHERE NOT EXISTS (SELECT 1 FROM files_fts WHERE rowid = f.id)"
+    ).fetchone()["c"]
+    if missing:
+        out["ok"] = False
+        out["problems"].append("%d 个文件没有对应的索引行" % missing)
+
+    try:
+        page = con.execute("PRAGMA page_size").fetchone()[0]
+        free = con.execute("PRAGMA freelist_count").fetchone()[0]
+        out["reclaimable"] = page * free
+    except sqlite3.DatabaseError:
+        out["reclaimable"] = 0
+    out["db_bytes"] = os.path.getsize(DB_PATH) if DB_PATH.exists() else 0
+    return out
+
+
+def vacuum(con) -> dict:
+    """整理碎片。删过很多文件之后能收回不少空间。"""
+    before = os.path.getsize(DB_PATH) if DB_PATH.exists() else 0
+    con.execute("INSERT INTO files_fts(files_fts) VALUES('optimize')")
+    con.commit()
+    con.execute("VACUUM")
+    con.commit()
+    after = os.path.getsize(DB_PATH) if DB_PATH.exists() else 0
+    return {"before": before, "after": after, "saved": max(0, before - after)}
+
+
+def clear(con) -> None:
+    """清空内容但保留结构，下一次扫描会重建。"""
+    con.executescript(
+        "DELETE FROM files;"
+        "DELETE FROM files_fts;"
+        "DELETE FROM projects;"
+        "DELETE FROM meta WHERE k IN ('last_scan','scan_seconds');"
+    )
+    con.commit()
+    con.execute("VACUUM")
+    con.commit()

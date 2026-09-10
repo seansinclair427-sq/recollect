@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shiyi"
+version = "1.0.0"
+description = "拾遗 —— 把散落在硬盘里的每一件东西找回来。本地作品档案馆，零依赖。"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+keywords = ["search", "desktop", "chinese", "full-text", "local-first", "档案", "检索"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Environment :: Win32 (MS Windows)",
+  "Intended Audience :: End Users/Desktop",
+  "Natural Language :: Chinese (Simplified)",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Desktop Environment :: File Managers",
+  "Topic :: Utilities",
+]
+# 运行时零依赖，这是设计目标，不是还没来得及加。
+dependencies = []
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+
+[project.scripts]
+shiyi = "shiyi.cli:main"
+
+[project.gui-scripts]
+shiyi-app = "shiyi.app:main"
+
+[tool.setuptools]
+packages = ["shiyi"]
+
+[tool.setuptools.package-data]
+shiyi = ["web/*.html", "web/*.css", "web/*.js", "web/*.ico"]

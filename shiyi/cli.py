@@ -7,6 +7,8 @@ import sys
 import time
 
 from . import __version__, report, store, scan, projects as projmod, timeline
+from pathlib import Path
+
 from .config import Config, DATA_DIR, DB_PATH
 
 
@@ -152,6 +154,111 @@ def cmd_export(args) -> int:
     return 0
 
 
+def cmd_app(args) -> int:
+    """当软件启动：托盘 + 窗口 + 定时扫描。"""
+    from .app import Application
+    return Application(tray=not args.no_tray,
+                       open_window=not args.no_window,
+                       port=args.port).run()
+
+
+def cmd_install(args) -> int:
+    from . import winintegration as wi
+    if not wi.supported():
+        print("只支持 Windows。")
+        return 1
+    r = wi.install(desktop=not args.no_desktop,
+                   start_menu=not args.no_start_menu,
+                   autostart=args.autostart)
+    for s in r.get("shortcuts", []):
+        print("已创建：%s" % s)
+    if args.autostart:
+        print("开机自启：%s" % ("已开启" if r["autostart"] else "设置失败"))
+    if not r.get("shortcuts"):
+        print("没有创建任何快捷方式。")
+    return 0
+
+
+def cmd_uninstall(args) -> int:
+    from . import winintegration as wi
+    if not args.yes:
+        print("这会删除快捷方式并取消开机自启" +
+              ("，并删除索引" if args.purge else "（索引保留）") + "。")
+        if input("确定吗？输入 y 继续：").strip().lower() != "y":
+            print("已取消。")
+            return 1
+    r = wi.uninstall(remove_index=args.purge)
+    for s in r["removed"]:
+        print("已删除：%s" % s)
+    print("索引：%s" % ("已删除" if r["index_removed"] else "保留"))
+    print("程序文件本身没动。删掉这个文件夹就彻底没了。")
+    return 0
+
+
+def cmd_autostart(args) -> int:
+    from . import winintegration as wi
+    if args.state is None:
+        print("开机自启：%s" % ("已开启" if wi.autostart_enabled() else "未开启"))
+        return 0
+    ok = wi.set_autostart(args.state == "on")
+    print("开机自启：%s" % ("已开启" if wi.autostart_enabled() else "未开启")
+          if ok else "设置失败")
+    return 0 if ok else 1
+
+
+def cmd_doctor(args) -> int:
+    """自检：环境、索引、配置，出问题时先跑这个。"""
+    import platform
+    import sqlite3 as sq
+    from . import __version__
+    from .logsetup import LOG_PATH
+    from .window import find_browser
+    from . import winintegration as wi
+
+    print("拾遗 %s" % __version__)
+    print("  Python   %s" % sys.version.split()[0])
+    print("  SQLite   %s" % sq.sqlite_version)
+    print("  系统     %s" % platform.platform())
+    print("  打包     %s" % ("是" if getattr(sys, "frozen", False) else "否（源码运行）"))
+
+    try:
+        c = sq.connect(":memory:")
+        c.execute("CREATE VIRTUAL TABLE t USING fts5(x, tokenize='trigram')")
+        print("  FTS5     可用（trigram 正常）")
+    except Exception as exc:
+        print("  FTS5     不可用：%s  <- 中文检索会失效" % exc)
+
+    b = find_browser()
+    print("  应用窗口 %s" % (Path(b).name if b else "找不到 Edge/Chrome，会退回默认浏览器"))
+    print("  开机自启 %s" % ("已开启" if wi.autostart_enabled() else "未开启"))
+    print("  日志     %s" % LOG_PATH)
+
+    cfg = Config.load()
+    print()
+    print("扫描根目录：")
+    for r in cfg.roots:
+        print("  %s %s" % ("✓" if os.path.isdir(r) else "✗ 不存在", r))
+
+    con = store.connect()
+    h = store.health(con, deep=args.deep)
+    print()
+    print("索引：%s" % ("正常" if h["ok"] else "有问题"))
+    print("  文件 %s · 大小 %s%s"
+          % (format(h["files"], ","), _hsize(h["db_bytes"]),
+             " · 可回收 " + _hsize(h["reclaimable"]) if h["reclaimable"] else ""))
+    for p in h["problems"]:
+        print("  ! %s" % p)
+    if not args.deep:
+        print("  （加 --deep 会跑 SQLite 完整性自检，大库要几秒）")
+    return 0 if h["ok"] else 2
+
+
+def cmd_log(args) -> int:
+    from .logsetup import tail
+    print(tail(args.lines))
+    return 0
+
+
 def cmd_serve(args) -> int:
     from .server import serve
     cfg = Config.load()
@@ -231,12 +338,41 @@ def main(argv=None) -> int:
     s.add_argument("-o", "--out", help="输出目录，默认桌面")
     s.set_defaults(fn=cmd_export)
 
+    s = sub.add_parser("app", help="当软件启动（托盘 + 窗口）")
+    s.add_argument("-p", "--port", type=int)
+    s.add_argument("--no-tray", action="store_true")
+    s.add_argument("--no-window", action="store_true")
+    s.set_defaults(fn=cmd_app)
+
+    s = sub.add_parser("install", help="创建快捷方式")
+    s.add_argument("--autostart", action="store_true", help="同时设置开机自启")
+    s.add_argument("--no-desktop", action="store_true")
+    s.add_argument("--no-start-menu", action="store_true")
+    s.set_defaults(fn=cmd_install)
+
+    s = sub.add_parser("uninstall", help="删除快捷方式与开机自启")
+    s.add_argument("--purge", action="store_true", help="同时删除索引")
+    s.add_argument("-y", "--yes", action="store_true", help="不再询问")
+    s.set_defaults(fn=cmd_uninstall)
+
+    s = sub.add_parser("autostart", help="查看或设置开机自启")
+    s.add_argument("state", nargs="?", choices=["on", "off"])
+    s.set_defaults(fn=cmd_autostart)
+
+    s = sub.add_parser("doctor", help="自检：环境、索引、配置")
+    s.add_argument("--deep", action="store_true", help="连数据库完整性一起查")
+    s.set_defaults(fn=cmd_doctor)
+
+    s = sub.add_parser("log", help="打印最近日志")
+    s.add_argument("-n", "--lines", type=int, default=200)
+    s.set_defaults(fn=cmd_log)
+
     sub.add_parser("where", help="索引存在哪").set_defaults(fn=cmd_where)
     sub.add_parser("reset", help="清空索引").set_defaults(fn=cmd_reset)
 
     args = ap.parse_args(argv)
     if not getattr(args, "fn", None):
-        return cmd_serve(argparse.Namespace(port=None, no_browser=False))
+        return cmd_app(argparse.Namespace(port=None, no_tray=False, no_window=False))
     return args.fn(args)
 
 

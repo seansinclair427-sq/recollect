@@ -26,6 +26,9 @@ IGNORE_DIRS = {
     ".ollama", ".rustup", ".cargo", ".nuget", ".gradle", ".android", ".dotnet",
     ".deepcode", ".u2net", ".chocolatey", ".claude", ".codex", ".conda",
     "Temp", "tmp", "logs", "log", "Crashpad", "GPUCache", "Code Cache",
+    # 聊天软件的私有数据库和表情缓存 —— 是软件的内脏，不是你的文件
+    "db_storage", "FileStorage", "CustomEmotion", "emoticon", "Applet",
+    "radium", "WMPNSSV", "ShaderCache", "IndexedDB", "Service Worker",
     # 游戏 / 大体积资源库（用户机器上确实存在）
     "versions", "libraries", "assets", "saves", "resourcepacks", "shaderpacks",
 }
@@ -34,6 +37,11 @@ IGNORE_DIR_PREFIXES = ("~$", ".dart_tool", "node-v")
 
 IGNORE_FILE_PREFIXES = ("~$", ".~lock.")
 IGNORE_FILE_NAMES = {"NTUSER.DAT", "ntuser.dat", "desktop.ini", "Thumbs.db", ".DS_Store"}
+# 这些后缀永远不会是你写的东西：数据库边车、下载中间态、临时文件
+IGNORE_FILE_SUFFIXES = (
+    ".db-wal", ".db-shm", ".sqlite-wal", ".sqlite-shm", ".material",
+    ".crdownload", ".part", ".partial", ".tmp", ".temp", ".swp", ".lock",
+)
 
 # ---------------------------------------------------------------- 分类
 KIND_BY_EXT = {}
@@ -180,12 +188,22 @@ def _default_roots() -> list[str]:
 
 @dataclass
 class Config:
+    # —— 扫描 ——
     roots: list[str] = field(default_factory=_default_roots)
     extra_ignores: list[str] = field(default_factory=list)
     max_text_bytes: int = 400_000       # 单文件抽取正文上限
     max_file_bytes: int = 120_000_000   # 超过此大小不打开
     index_content: bool = True
+    # —— 运行方式 ——
     port: int = 7331
+    auto_scan_minutes: int = 60         # 0 = 不自动扫描
+    scan_on_start: bool = True
+    minimize_to_tray: bool = True
+    open_window_on_start: bool = True
+    window_width: int = 1180
+    window_height: int = 780
+    theme: str = "auto"                 # auto / light / dark
+    first_run_done: bool = False
 
     @classmethod
     def load(cls) -> "Config":
@@ -193,7 +211,7 @@ class Config:
             try:
                 raw = json.loads(CONFIG_PATH.read_text("utf-8"))
                 known = {f for f in cls.__dataclass_fields__}
-                return cls(**{k: v for k, v in raw.items() if k in known})
+                return cls(**{k: v for k, v in raw.items() if k in known}).clamp()
             except Exception:
                 pass
         return cls()
@@ -208,3 +226,16 @@ class Config:
         if name in IGNORE_DIRS or name in self.extra_ignores:
             return True
         return name.startswith(IGNORE_DIR_PREFIXES)
+
+    def clamp(self) -> "Config":
+        """把从磁盘读回来的值收进合理范围，坏配置不该让程序起不来。"""
+        self.port = min(65535, max(1024, int(self.port or 7331)))
+        self.auto_scan_minutes = min(1440, max(0, int(self.auto_scan_minutes or 0)))
+        self.max_text_bytes = min(4_000_000, max(10_000, int(self.max_text_bytes)))
+        self.max_file_bytes = max(1_000_000, int(self.max_file_bytes))
+        self.window_width = min(3840, max(760, int(self.window_width)))
+        self.window_height = min(2160, max(520, int(self.window_height)))
+        if self.theme not in ("auto", "light", "dark"):
+            self.theme = "auto"
+        self.roots = [r for r in self.roots if isinstance(r, str) and r.strip()]
+        return self

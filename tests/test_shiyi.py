@@ -27,9 +27,14 @@ def make_docx(path, paras):
         z.writestr("word/document.xml", xml)
 
 
-def make_pptx(path, slides, notes=None):
+def make_pptx(path, slides, notes=None, pad=0):
+    """pad 用来把文件撑到「成品」的体积门槛（20KB）以上。"""
     with zipfile.ZipFile(path, "w") as z:
         z.writestr("[Content_Types].xml", "<Types/>")
+        if pad:
+            z.writestr("ppt/media/pad.bin",
+                       bytes(range(256)) * (pad // 256 + 1),
+                       compress_type=zipfile.ZIP_STORED)
         for i, texts in enumerate(slides, 1):
             runs = "".join("<a:p><a:r><a:t>%s</a:t></a:r></a:p>" % t for t in texts)
             z.writestr("ppt/slides/slide%d.xml" % i,
@@ -524,3 +529,190 @@ class TestServerLive(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ═══════════════════════════════════════════════════════ 配置与外壳
+class TestConfigClamp(unittest.TestCase):
+    def test_clamp_pulls_values_into_range(self):
+        c = Config(port=1, auto_scan_minutes=99999, max_text_bytes=1,
+                   window_width=10, window_height=99999, theme="紫色")
+        c.clamp()
+        self.assertGreaterEqual(c.port, 1024)
+        self.assertLessEqual(c.auto_scan_minutes, 1440)
+        self.assertGreaterEqual(c.max_text_bytes, 10_000)
+        self.assertGreaterEqual(c.window_width, 760)
+        self.assertLessEqual(c.window_height, 2160)
+        self.assertEqual(c.theme, "auto")
+
+    def test_clamp_drops_blank_roots(self):
+        c = Config(roots=[r"C:\keep", "", "   ", None])   # type: ignore[list-item]
+        c.clamp()
+        self.assertEqual(c.roots, [r"C:\keep"])
+
+    def test_bad_config_file_falls_back_to_defaults(self):
+        tmp = Path(tempfile.mkdtemp(prefix="shiyi-cfg-"))
+        try:
+            from shiyi import config as C
+            old = C.CONFIG_PATH
+            C.CONFIG_PATH = tmp / "config.json"
+            C.CONFIG_PATH.write_text("{ this is not json", encoding="utf-8")
+            c = Config.load()
+            self.assertIsInstance(c.roots, list)
+            self.assertEqual(c.port, 7331)
+            C.CONFIG_PATH = old
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
+class TestIgnoreRules(unittest.TestCase):
+    def test_sidecar_files_are_ignored(self):
+        from shiyi.config import IGNORE_FILE_SUFFIXES
+        for n in ("session.db-wal", "sns.db-shm", "a.material", "x.crdownload",
+                  "y.part", "z.tmp"):
+            self.assertTrue(n.lower().endswith(IGNORE_FILE_SUFFIXES), n)
+
+    def test_real_files_are_not_ignored(self):
+        from shiyi.config import IGNORE_FILE_SUFFIXES
+        for n in ("报告.docx", "main.py", "笔记.md", "data.db"):
+            self.assertFalse(n.lower().endswith(IGNORE_FILE_SUFFIXES), n)
+
+    def test_chat_app_internals_are_pruned(self):
+        from shiyi.config import IGNORE_DIRS
+        for d in ("db_storage", "FileStorage", "CustomEmotion"):
+            self.assertIn(d, IGNORE_DIRS)
+
+
+class TestAppShell(unittest.TestCase):
+    def test_runtime_roundtrip(self):
+        from shiyi import app as A
+        tmp = Path(tempfile.mkdtemp(prefix="shiyi-rt-"))
+        try:
+            old = A.RUNTIME_PATH
+            A.RUNTIME_PATH = tmp / "runtime.json"
+            A.write_runtime(7331, "tok123")
+            d = A.read_runtime()
+            self.assertEqual(d["port"], 7331)
+            self.assertEqual(d["token"], "tok123")
+            A.clear_runtime()
+            self.assertEqual(A.read_runtime(), {})
+            A.RUNTIME_PATH = old
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_read_runtime_survives_garbage(self):
+        from shiyi import app as A
+        tmp = Path(tempfile.mkdtemp(prefix="shiyi-rt2-"))
+        try:
+            old = A.RUNTIME_PATH
+            A.RUNTIME_PATH = tmp / "runtime.json"
+            A.RUNTIME_PATH.write_text("not json", encoding="utf-8")
+            self.assertEqual(A.read_runtime(), {})
+            A.RUNTIME_PATH = old
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_single_instance_second_acquire_fails(self):
+        # 用独立名字，免得撞上真在跑的那一份
+        from shiyi.app import SingleInstance
+        name = "Local\ShiyiTest_%d" % os.getpid()
+        a, b = SingleInstance(name), SingleInstance(name)
+        try:
+            self.assertTrue(a.acquire())
+            self.assertFalse(b.acquire())
+            self.assertTrue(b.already_running)
+        finally:
+            b.release()
+            a.release()
+
+
+class TestPlatformBits(unittest.TestCase):
+    def test_launch_command_is_quoted(self):
+        from shiyi import winintegration as wi
+        cmd = wi.launch_command()
+        self.assertTrue(cmd.startswith('"'), cmd)
+        self.assertIn(".exe", cmd.lower())
+
+    def test_find_browser_returns_path_or_none(self):
+        from shiyi.window import find_browser
+        b = find_browser()
+        self.assertTrue(b is None or Path(b).exists(), b)
+
+    def test_resource_dir_has_web_assets(self):
+        from shiyi import web_dir
+        self.assertTrue((web_dir() / "index.html").is_file())
+        self.assertTrue((web_dir() / "app.js").is_file())
+        self.assertTrue((web_dir() / "icon.ico").is_file())
+
+
+class TestMaintenance(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="shiyi-mt-"))
+        (self.tmp / "root").mkdir()
+        make_docx(self.tmp / "root" / "a.docx", ["维护测试内容"] * 8)
+        self.cfg = Config(roots=[str(self.tmp / "root")])
+        self.con = store.connect(self.tmp / "db.sqlite")
+        scan.scan(self.con, self.cfg, scan.Progress())
+
+    def tearDown(self):
+        self.con.close()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_health_shallow_is_ok(self):
+        h = store.health(self.con)
+        self.assertTrue(h["ok"])
+        self.assertFalse(h["deep"])
+        self.assertGreater(h["files"], 0)
+
+    def test_health_deep_runs_integrity_check(self):
+        h = store.health(self.con, deep=True)
+        self.assertTrue(h["ok"], h["problems"])
+        self.assertTrue(h["deep"])
+
+    def test_clear_empties_everything(self):
+        store.clear(self.con)
+        self.assertEqual(store.stats(self.con)["files"], 0)
+        self.assertEqual(store.search(self.con, "维护测试内容")["total"], 0)
+
+    def test_rescan_after_clear_restores(self):
+        store.clear(self.con)
+        scan.scan(self.con, self.cfg, scan.Progress())
+        self.assertGreater(store.search(self.con, "维护测试内容")["total"], 0)
+
+
+class TestReport(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="shiyi-rp-"))
+        (self.tmp / "root").mkdir()
+        make_pptx(self.tmp / "root" / "路演.pptx", [["市长杯决赛"] * 40], pad=40_000)
+        self.cfg = Config(roots=[str(self.tmp / "root")])
+        self.con = store.connect(self.tmp / "db.sqlite")
+        scan.scan(self.con, self.cfg, scan.Progress())
+
+    def tearDown(self):
+        self.con.close()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_year_html_is_self_contained(self):
+        from shiyi import report
+        html = report.year_html(self.con, time.localtime().tm_year)
+        self.assertTrue(html.startswith("<!doctype html>"))
+        self.assertIn("<style>", html)
+        # 不能引用任何外部资源，换台电脑打开也要一样
+        for bad in ("http://", "https://", "<script"):
+            self.assertNotIn(bad, html.lower())
+
+    def test_year_html_escapes_names(self):
+        from shiyi import report
+        # Windows 文件名不能带 < >，用 & 来验证转义走没走
+        evil = self.tmp / "root" / "报告&注入.pptx"
+        make_pptx(evil, [["注入测试"] * 30], pad=40_000)
+        scan.scan(self.con, self.cfg, scan.Progress())
+        html = report.year_html(self.con, time.localtime().tm_year)
+        self.assertIn("报告&amp;注入", html)
+        self.assertNotIn("报告&注入", html)
+
+    def test_write_year_creates_file(self):
+        from shiyi import report
+        p = report.write_year(self.con, time.localtime().tm_year, str(self.tmp))
+        self.assertTrue(Path(p).is_file())
+        self.assertGreater(Path(p).stat().st_size, 500)

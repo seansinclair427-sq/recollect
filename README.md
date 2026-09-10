@@ -13,29 +13,66 @@
 
 零依赖、零联网、零账号。只读你的文件，从不改动它们。
 
----
+<br>
 
-## 开始用
+## 装上它
 
-双击 **`启动拾遗.bat`**。
+**方式一：直接用（不需要 Python）**
 
-第一次会自己扫一遍（15 万个文件约 90 秒），扫完浏览器自动打开。
-以后每次启动都是秒开，重新扫描只处理变动过的文件。
+双击 `打包成exe.bat` 生成 `dist\拾遗\拾遗.exe`，之后双击这个 exe 就行。
+也可以把整个 `dist\拾遗` 文件夹拷到别的电脑上用。
 
-需要 Python 3.10 以上。除此之外什么都不用装。
+**方式二：有 Python 的话**
 
----
+```bash
+pip install -e .        # 之后就有 shiyi 命令
+shiyi                   # 启动（托盘 + 窗口）
+```
 
-## 四个页面
+或者直接双击 `启动拾遗.bat`。
+
+**把它放到桌面和开始菜单**：双击 `安装快捷方式.bat`，或在软件里
+「设置 → 系统 → 创建桌面和开始菜单快捷方式」。
+
+需要 Python 3.10 以上（用 exe 的话什么都不需要）。
+
+<br>
+
+## 它怎么待着
+
+启动后它在**系统托盘**里常驻，图标是一枚朱砂色的「拾」印。
+
+- **左键点图标** —— 打开窗口
+- **右键点图标** —— 立即扫描 / 打开索引目录 / 查看日志 / 退出
+- **关掉窗口** —— 不退出，继续待在托盘里，随时能搜
+- **再点一次桌面图标** —— 唤起已经开着的那个，不会起第二份
+
+窗口用 Edge 或 Chrome 的 `--app` 模式打开：没有地址栏、没有标签页，
+用的是独立配置目录，跟你平时的浏览器完全隔开——不共享 Cookie、
+不进浏览历史、关掉也不影响你原来开的网页。找不到 Edge/Chrome 就退回默认浏览器。
+
+它每隔一小时（可调）在后台做一次增量扫描，15 万文件大约 9 秒，你不用记得点。
+
+<br>
+
+## 六个页面
 
 ### 检索
 
 搜什么都行。搜「鸭子坐」会翻出你三个月前写的那篇分析，哪怕它藏在
 `temp.docx` 里；搜「果蝇」会命中一份 12 万字的生物试卷 PDF 的正文。
 
-- `/` 聚焦搜索框，`↑ ↓` 选，`Enter` 打开，`Shift+Enter` 定位到文件夹
-- 双击结果直接用默认程序打开
-- 右侧能直接读全文，PPT 会标出在第几页
+| 快捷键 | |
+|---|---|
+| `/` | 跳到搜索框 |
+| `↑` `↓` | 在结果里移动 |
+| `Enter` | 用默认程序打开 |
+| `Shift`+`Enter` | 在文件夹中显示 |
+| `Esc` | 清空搜索 |
+| `Ctrl`+`1..4` | 切换页面 |
+
+右侧能直接读全文，PPT 会标出在第几页。可以按相关度/时间/大小排序，
+可以只看某一类文件，可以把结果导出成 CSV 放到桌面。
 
 三个字以上走 trigram 索引，通常 **1 毫秒**；一到两个字（「课表」「支教」
 这种）索引用不上，改成直接扫正文，约 140 毫秒。
@@ -71,35 +108,64 @@
 写了多少万字、最忙的是哪个月、最活跃的项目是哪几个。
 
 `gradle-wrapper.jar` 和 `node.exe` 不算作品，你自己编的 `.apk` 算。
+可以导出成一页独立 HTML，`Ctrl+P` 就能存成 PDF——报名、答辩、履历都用得上。
 
----
+### 设置
+
+扫描目录、额外排除项、要不要索引正文、自动扫描间隔、外观（跟随系统 /
+浅色 / 深色）、开机自启、创建快捷方式。
+
+外观和开机自启点了立刻生效；其余改动点「保存」才算数，没保存时侧栏上
+会有个小圆点提醒你。
+
+### 关于
+
+版本与运行环境、索引体检、快捷键一览、日志、退出与卸载。
+
+索引维护有四个动作：**体检**（跑一遍 SQLite 完整性检查）、**整理碎片**
+（回收删掉文件留下的空间）、**重建**（清空后重读一遍）、**清空**。
+无论哪个都不会动你的原始文件。
+
+<br>
 
 ## 命令行
 
-不想开浏览器的时候：
+装过之后有 `shiyi` 命令；没装就用 `python -m shiyi`。
 
 ```bash
-python -m shiyi scan          # 扫描（增量）
-python -m shiyi scan --full   # 忽略缓存，全部重读
-python -m shiyi search 慧食安  # 检索
-python -m shiyi projects      # 列出项目
-python -m shiyi clusters      # 版本堆积
-python -m shiyi dups          # 内容重复
-python -m shiyi year 2026     # 年鉴
-python -m shiyi serve         # 启动网页界面
-python -m shiyi where         # 索引存在哪
-python -m shiyi reset         # 清空索引
+shiyi                      # 当软件启动（托盘 + 窗口）
+shiyi doctor               # 自检：环境、索引、配置。出问题先跑这个
+shiyi doctor --deep        # 连数据库完整性一起查
+
+shiyi scan                 # 扫描（增量）
+shiyi scan --full          # 忽略缓存，全部重读
+shiyi search 慧食安         # 检索
+shiyi projects             # 列出项目
+shiyi clusters             # 版本堆积
+shiyi dups                 # 内容重复
+shiyi year 2026            # 年鉴
+shiyi export 2026          # 把年鉴导出成 HTML
+
+shiyi install              # 创建桌面和开始菜单快捷方式
+shiyi install --autostart  # 顺便设开机自启
+shiyi autostart on|off     # 单独管开机自启
+shiyi uninstall            # 删快捷方式和自启（--purge 连索引一起删）
+
+shiyi serve                # 只起网页服务，不进托盘
+shiyi log                  # 打印最近日志
+shiyi where                # 索引存在哪
+shiyi reset                # 清空索引
 ```
 
----
+<br>
 
 ## 它扫哪里
 
-默认是 `Documents`、`Desktop`、`Downloads`、`OneDrive`。
-在界面左下角「设置」里可以增删。
+默认是 `Documents`、`Desktop`、`Downloads`、`OneDrive`，在「设置」里可以增删。
 
 **不会碰的地方**：`node_modules`、`.git`、`AppData`、各种 `build`/`dist`、
-Minecraft 的 `versions`/`libraries`、以及你自己加的排除项。
+Minecraft 的 `versions`/`libraries`、聊天软件的私有数据库（`db_storage`、
+`.db-wal`、`.material` 这些），以及你自己加的排除项。
 
 **云端文件**：OneDrive 里没下载到本地的占位文件只记录文件名，绝不打开——
 否则扫一遍等于把整个网盘拖下来（你的 OneDrive 有 78% 是这种文件）。
@@ -107,9 +173,9 @@ Minecraft 的 `versions`/`libraries`、以及你自己加的排除项。
 **大堆纯文本**：一个目录里塞了 4MB 以上裸文本（游戏模组的语言文件、
 工具链自带的文档、Python 标准库的测试用例），只索引文件名不抽正文。
 这条规则刻意不适用于 docx / pptx / pdf——那些是压缩包，体积大不代表字多，
-早期版本按体积算，把你整个「期中复盘」文件夹误伤过一次。
+早期版本按体积算，把整个「期中复盘」文件夹误伤过一次。
 
----
+<br>
 
 ## 关于 PDF
 
@@ -119,9 +185,9 @@ PostScript 词法器抓取绘字指令，再按文字在页面上的坐标重排
 
 Word / PowerPoint / LaTeX 导出的中文 PDF 都能读。**扫描件读不出来**——
 那是一张张图片，没有文字层，界面上会如实标成「扫描件，无正文」而不是
-假装成功。你那 20 份学生个人档案就是这种。
+假装成功。那 20 份学生个人档案就是这种。
 
----
+<br>
 
 ## 数据在哪
 
@@ -129,11 +195,14 @@ Word / PowerPoint / LaTeX 导出的中文 PDF 都能读。**扫描件读不出�
 %USERPROFILE%\.shiyi\
   shiyi.db        索引（15 万个文件约 420MB）
   config.json     配置
+  shiyi.log       日志（自动轮转，最多留 3 份）
+  runtime.json    正在运行的端口和令牌
+  window\         应用窗口的独立浏览器配置
 ```
 
 删掉整个目录就等于卸载。你的原始文件一个字节都不会变。
 
----
+<br>
 
 ## 它不会做的事
 
@@ -141,17 +210,55 @@ Word / PowerPoint / LaTeX 导出的中文 PDF 都能读。**扫描件读不出�
 - 不删除、不移动、不重命名你的任何文件
 - 不给扫描件做 OCR（读不出来就说读不出来）
 - 服务只监听 `127.0.0.1`，有副作用的接口都要带启动时生成的一次性 token，
-  别的网页打不到你的本地端口
+  别的网页打不到你的本地端口；能打开的路径必须已经在索引里
 
----
+<br>
 
-## 跑测试
+## 出问题了
+
+先跑 `shiyi doctor`，它会把环境、索引、配置都查一遍。
+再看 `~/.shiyi/shiyi.log`（软件里「关于 → 日志」也能直接看）。
+
+常见情况：
+
+| 症状 | 原因 |
+|---|---|
+| 中文搜不到 | `doctor` 里看 FTS5 那行；trigram 不可用的话得换个 Python |
+| 窗口没弹出来 | 没装 Edge/Chrome，会退回默认浏览器；也可能被拦截了 |
+| 端口被占 | 会自动往后挪，`runtime.json` 里能看到实际端口 |
+| 双击没反应 | 多半已经在托盘里跑着了，找那枚「拾」印 |
+
+<br>
+
+## 开发
 
 ```bash
-python -m unittest discover -s tests
+python -m unittest discover -s tests    # 71 个测试
+python tools/make_icon.py               # 重新生成图标
+python tools/build_exe.py               # 打包（--onefile 出单文件）
 ```
 
-52 个用例，覆盖正文抽取、PDF 的 CMap 与版面还原、中文检索的两条路径、
-增量扫描与删除、版本聚簇的边界（24 个 README 不算「版本堆积」），
+测试覆盖正文抽取、PDF 的 CMap 与版面还原、中文检索的两条路径、
+增量扫描与删除、版本聚簇的边界（24 个 README 不算「版本堆积」）、
+配置的容错、单实例、索引维护、年鉴的 HTML 转义，
 以及一个真跑起来的服务端：无 token / 错 token / 跨源请求要被拒，
 索引外的路径不许打开，目录穿越要 404。
+
+代码结构：
+
+| 文件 | 干什么 |
+|---|---|
+| `app.py` | 应用外壳：单实例、托盘、窗口、定时扫描 |
+| `server.py` | 本地 HTTP 服务与 JSON 接口 |
+| `scan.py` | 扫描与增量索引 |
+| `store.py` | SQLite + FTS5，检索与维护 |
+| `textract.py` | docx / pptx / xlsx / 文本抽取 |
+| `pdftext.py` | 纯标准库 PDF 正文抽取 |
+| `projects.py` | 项目识别、版本聚簇、重复检测 |
+| `timeline.py` | 时间线与年鉴统计 |
+| `report.py` | 年鉴 HTML 导出 |
+| `tray.py` | Win32 托盘（纯 ctypes） |
+| `window.py` | 应用窗口 |
+| `winintegration.py` | 开机自启、快捷方式、卸载 |
+
+MIT 许可证。
