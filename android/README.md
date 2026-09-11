@@ -1,118 +1,153 @@
-# 拾遗 · 安卓版
+# Recollect for Android · 拾遗
 
-**把散落在手机里的每一件东西找回来。**
+[简体中文](README.zh-CN.md)
 
-和电脑版同一个东西、同一套设计语言：读你的 Word、PPT、Excel 和笔记的
-**正文**，一句话就能搜到——不是找文件名，是找你当时写下的那句话。
+**Find every single thing you ever made, scattered across your phone.**
 
-只读、不联网、不需要账号。
+The same product and the same design language as the desktop app: it reads the
+**body text** of your Word, PowerPoint, Excel and notes, so one phrase is enough
+to find them again.
+
+Read-only, offline, no account.
+
+<img src="../docs/android-search.png" width="270" alt="Search"> <img src="../docs/android-detail.png" width="270" alt="Full text">
 
 <br>
 
-## 装上它
+## Install
 
-编译好的包在 `app/build/outputs/apk/release/app-release.apk`（约 1.1 MB）。
-传到手机上点开安装即可（需要允许「安装未知来源应用」）。
+Grab `app-release.apk` (~1.1 MB) from [Releases](../../../releases), copy it to
+your phone and open it. You'll need to allow installing from unknown sources.
 
-自己编译：
+Build it yourself:
 
 ```bash
 build.bat            # debug
-build.bat release    # release（已带自签名 keystore）
-build.bat install    # 编译并 adb 安装到已连接的设备
+build.bat release    # release
+build.bat install    # build and adb-install to a connected device
 ```
 
-需要 JDK 17+（脚本默认用 Android Studio 自带的 JBR）和 Android SDK 36。
+Requires JDK 17+ (the script defaults to the JBR bundled with Android Studio)
+and Android SDK 36.
+
+### Signing
+
+The signing keystore is not in the repository. Release builds succeed without
+it — they just come out unsigned. For a key you can keep upgrading over,
+generate your own:
+
+```bash
+keytool -genkeypair -keystore app/shiyi.jks -alias shiyi \
+        -keyalg RSA -keysize 2048 -validity 36500
+```
+
+Passwords can be overridden with `SHIYI_KEYSTORE_PASSWORD`,
+`SHIYI_KEY_PASSWORD` and `SHIYI_KEY_ALIAS`. **Don't lose the key** — change it
+and you can no longer install over an existing copy.
 
 <br>
 
-## 它怎么看到你的文件
+## How it sees your files
 
-**只能看到你亲手授权的文件夹。** 用的是安卓的 SAF（存储访问框架），
-首次打开时选一个文件夹，之后随时可以在设置里增删。
+**Only folders you hand it, explicitly.** It uses Android's Storage Access
+Framework: pick a folder on first launch, add or remove more in Settings later.
 
-刻意**不要** `MANAGE_EXTERNAL_STORAGE`（全盘访问）那个权限——
-权限范围小到能一句话说清楚，比「允许访问所有文件」诚实得多。
+It deliberately does **not** request `MANAGE_EXTERNAL_STORAGE` (all-files
+access). A permission scope you can state in one sentence is more honest than
+"allow access to all files".
 
-有两个坑是安卓自己的限制，不是应用的问题：
+Two restrictions come from Android itself, not from the app:
 
-| 选不了 | 为什么 |
+| Can't be granted | Why |
 |---|---|
-| 内部存储根目录 | 安卓 11 起禁止授权，防止应用一次要走全部 |
-| `Download` 根目录 | 同上。选它下面的**子文件夹**就可以 |
+| Root of internal storage | Blocked since Android 11 — apps must not grab everything at once |
+| The `Download` root | Same rule. Pick a **subfolder** of it instead |
 
-推荐先选 `Documents`。
+Start with `Documents`.
 
 <br>
 
-## 能读什么
+## What it can read
 
-| 格式 | 正文 |
+| Format | Body text |
 |---|---|
-| `.docx` `.pptx` `.xlsx` | ✅ 直接解 OOXML，PPT 还会标出「第 N 页」 |
-| `.txt` `.md` 代码 等 | ✅ UTF-8 读不通就按 GB18030 再试一次 |
-| `.pdf` | ❌ 只索引文件名 |
-| 图片 / 视频 / 音频 / 压缩包 | 只索引文件名 |
+| `.docx` `.pptx` `.xlsx` | ✅ OOXML parsed directly; slides are marked page by page |
+| `.txt` `.md`, source code | ✅ UTF-8 first, GB18030 as a fallback |
+| `.pdf` | ❌ filename only |
+| Images / video / audio / archives | Filename only |
 
-**为什么手机上不解析 PDF**：那需要解 FlateDecode、展开对象流、解析
-`/ToUnicode` 字体映射表，电脑版做了（四百多行），但在手机上为了几十份
-PDF 背这些代码不划算。界面里会如实标明「手机版不解析 PDF 正文」，
-而不是假装读过了。
-
-<br>
-
-## 检索怎么做的
-
-**没有用 FTS。** 手机上的文档是几百到几千份，正文加起来通常十几兆，
-直接 `LIKE` 扫一遍就是几毫秒；而 FTS5 的 trigram 分词器（电脑版用来做
-中文子串检索的那个）要求 SQLite 3.34+，安卓到 12 才稳定具备。
-为一个用不上的加速去牺牲兼容性，不划算。
-
-输入时防抖 120 ms——打字比查询快，没必要每个字都查一遍。
+**Why no PDF text on mobile**: it needs FlateDecode, object-stream expansion and
+`/ToUnicode` CMap parsing. The desktop version does all of that (400-odd lines),
+but carrying it on a phone for a handful of PDFs isn't worth it. The UI says so
+plainly instead of pretending it read them.
 
 <br>
 
-## 设计语言
+## How search works
 
-和电脑版同一套「纸与印」：
+**No FTS.** A phone holds hundreds to a few thousand documents — call it a dozen
+megabytes of text — and a straight `LIKE` scan over that takes a few
+milliseconds. Meanwhile FTS5's trigram tokenizer (what the desktop version uses
+for Chinese substring search) needs SQLite 3.34+, which Android only reliably
+has from 12 onward. Trading compatibility for a speedup you don't need is a bad
+deal.
 
-- **纸** —— 内容躺在暖白的纸上，层次靠光影不靠描边
-- **印** —— 朱砂只留三处：当前位置、主操作、命中高亮
-- **墨** —— 字有轻重，名字最重，路径最轻
-
-动效按 Material 3 的分级：微交互 120ms、组件 200ms、容器 300ms、
-屏幕级 380ms；进入用减速曲线 `(.05,.7,.1,1)`，离场用加速曲线
-`(.3,0,.8,.15)`。结果逐条错峰登场（18ms 一档，封顶 14 条），
-页面切换是横向滑入 + 淡出。
-
-刻意**不开** Material You 的动态取色：这套配色本身就是产品的一部分，
-被系统壁纸改掉就不是拾遗了。
+Typing is debounced by 120 ms — people type faster than a query needs to run.
 
 <br>
 
-## 代码在哪
+## Design language
 
-| 文件 | 干什么 |
+The same *paper and seal* system as the desktop app:
+
+- **Paper** — content rests on warm white; depth comes from light, not borders
+- **Seal** — the vermillion accent is reserved for three things: current
+  location, primary action, search highlight
+- **Ink** — type carries weight: the name heaviest, the path lightest
+
+Motion follows Material 3's scale: 120 ms for micro-interactions, 200 ms for
+components, 300 ms for containers, 380 ms for screen transitions; entrances use
+the decelerating curve `(.05,.7,.1,1)`, exits the accelerating `(.3,0,.8,.15)`.
+Results stagger in 18 ms apart, capped at 14 rows. Screens slide horizontally.
+
+Material You dynamic color is deliberately **off**: this palette is part of the
+product, and letting the wallpaper repaint it would make it something else.
+
+<br>
+
+## Code
+
+| File | Role |
 |---|---|
-| `data/Extract.kt` | OOXML / 纯文本正文抽取，和电脑版同一套思路 |
-| `data/Store.kt` | 裸 SQLite，一张表，检索与统计 |
-| `data/Indexer.kt` | SAF 树遍历与增量索引 |
-| `ui/Theme.kt` | 「纸与印」的 Material 3 配色与动效规格 |
-| `ui/App.kt` | 通用组件：搜索栏、结果条、筛选、骨架屏 |
-| `MainActivity.kt` | 三个页面：检索 / 详情 / 设置，以及首次引导 |
+| `data/Extract.kt` | OOXML and plain-text extraction, same approach as desktop |
+| `data/Store.kt` | Bare SQLite, one table, search and statistics |
+| `data/Indexer.kt` | SAF tree walking and incremental indexing |
+| `ui/Theme.kt` | The *paper and seal* Material 3 palette and motion spec |
+| `ui/App.kt` | Shared components: search field, result row, filters, skeletons |
+| `MainActivity.kt` | Three screens — search / detail / settings — plus onboarding |
+
+The tree walk queries `ContentResolver` directly rather than using
+`DocumentFile`: the latter costs one IPC round trip per attribute, which turns
+a few thousand files into tens of seconds.
 
 <br>
 
-## 本机编译的两个坑
+## Two traps when building on Windows
 
-1. **不能直接跑 `gradlew`** —— 本机 `%TEMP%` 下 AF_UNIX 连不上，
-   Gradle 会报 `Unable to establish loopback connection`。
-   `build.bat` 会先把 TEMP 挪到 `C:\gradle-tmp` 再调。
-2. **工程名必须是 ASCII** —— `rootProject.name` 写中文会让 Gradle 的
-   中间产物路径炸成 `Invalid file path`。用户看到的名字在
-   `res/values/strings.xml` 里，不受影响。
+1. **Don't run `gradlew` directly** if `%TEMP%` can't do AF_UNIX — Gradle fails
+   with `Unable to establish loopback connection`. `build.bat` relocates TEMP to
+   `C:\gradle-tmp` first.
+2. **`rootProject.name` must be ASCII.** A CJK name makes Gradle blow up with
+   `Invalid file path` while building intermediate paths. The name users see
+   lives in `res/values/strings.xml` and is unaffected.
 
-数据存在应用私有目录（`/data/data/com.shiyi.archive/databases/shiyi.db`），
-卸载即清除。你的原始文件一个字节都不会变。
+Also: `local.properties` wants forward slashes in `sdk.dir` — backslashes are
+read as Java escape sequences.
 
-MIT 许可证。
+<br>
+
+The index lives in the app's private directory
+(`/data/data/com.shiyi.archive/databases/shiyi.db`) and disappears on uninstall.
+Not one byte of your original files changes.
+
+MIT License.

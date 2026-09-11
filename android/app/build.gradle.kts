@@ -17,13 +17,18 @@ android {
         versionName = "1.0.0"
     }
 
+    // 签名密钥不进版本库（见 .gitignore）。没有它也要能编出 release，
+    // 只是产物未签名——否则别人 clone 下来第一件事就是编译失败。
+    // 自己生成一把：见 android/README.md 的「签名」一节。
+    val keystore = file("shiyi.jks")
     signingConfigs {
-        create("selfsigned") {
-            // 自签名，方便长期升级覆盖安装。别弄丢 keystore。
-            storeFile = file("shiyi.jks")
-            storePassword = "shiyiarchive"
-            keyAlias = "shiyi"
-            keyPassword = "shiyiarchive"
+        if (keystore.exists()) {
+            create("selfsigned") {
+                storeFile = keystore
+                storePassword = System.getenv("SHIYI_KEYSTORE_PASSWORD") ?: "shiyiarchive"
+                keyAlias = System.getenv("SHIYI_KEY_ALIAS") ?: "shiyi"
+                keyPassword = System.getenv("SHIYI_KEY_PASSWORD") ?: "shiyiarchive"
+            }
         }
     }
 
@@ -36,7 +41,7 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"),
                           "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("selfsigned")
+            signingConfig = signingConfigs.findByName("selfsigned")
         }
     }
 

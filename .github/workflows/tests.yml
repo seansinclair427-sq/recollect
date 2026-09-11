@@ -1,0 +1,41 @@
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # Windows only on purpose: the tray, the icon renderer and the shell
+    # integration are Win32, and the tests check them for real.
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: SQLite must have FTS5 with the trigram tokenizer
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sqlite3
+          print("sqlite", sqlite3.sqlite_version)
+          c = sqlite3.connect(":memory:")
+          c.execute("CREATE VIRTUAL TABLE t USING fts5(x, tokenize='trigram')")
+          print("fts5 trigram: ok")
+          PY
+
+      - name: Run the test suite
+        run: python -m unittest discover -s tests -v
+
+      - name: Self-check
+        run: python -m shiyi doctor

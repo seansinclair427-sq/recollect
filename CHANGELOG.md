@@ -1,58 +1,107 @@
-# 更新记录
+# Changelog
 
-约定：`新增` / `改进` / `修复` / `移除`。日期是本机完成的日期。
+[简体中文](CHANGELOG.zh-CN.md)
+
+Sections: `Added` / `Changed` / `Fixed` / `Removed`. Dates are when the work was
+finished on the development machine.
+
+## 1.0.1 — 2026-09-11
+
+### Added
+- Redesigned interface around a design language called *paper and seal*:
+  depth comes from light, not borders; the vermillion accent is reserved for
+  exactly three things — current location, primary action, search highlight
+- A motion system following Material 3's scale: 120 ms for micro-interactions,
+  200 ms for components, 300 ms for containers, 380 ms for screen-level
+  transitions; decelerating curves for entrances, accelerating for exits.
+  Results stagger in, the detail panel slides from the right, yearbook bars
+  grow from the baseline, skeletons replace spinners. All of it switches off
+  under `prefers-reduced-motion`
+- Deep links: `?q=<term>` opens with a query, `#tidy` opens on that screen,
+  so a result set or a view can be bookmarked and shared
+- Recent searches replaced the hardcoded example terms — stored in the
+  browser only, never uploaded, never indexed
+- **Android app** (`android/`): Kotlin + Compose + Material 3, same design
+  language, same text-extraction approach
+
+### Changed
+- The first result is selected automatically — the right half of the window is
+  no longer empty, and it saves a click
+- Kind filters are ordered by importance (documents / slides / PDF / sheets …)
+  rather than by count, which used to let "other · 103,630" own the first slot
+- An empty query lists *work* only, instead of putting `.lnk` and `.gitignore`
+  on the first screen
+- Sidebar statistics moved up under the navigation as an aligned key-value block
+- Android release builds now succeed without the signing keystore (producing an
+  unsigned APK) — otherwise the first thing a fresh clone does is fail to build
 
 ## 1.0.0 — 2026-09-11
 
-从「一个能跑的脚本」变成一个完整的软件。
+From a working script into an actual piece of software.
 
-### 新增
-- **应用外壳**：单实例（再点一次图标唤起已开的窗口，而不是又起一份）、
-  系统托盘常驻、关掉窗口不退出、退出前清理干净
-- **系统托盘**：纯 ctypes 调 Win32，不引入 pystray / Pillow。左键打开，
-  右键菜单可立即扫描 / 打开索引目录 / 看日志 / 退出；扫完弹气泡提示
-- **应用窗口**：用 Edge / Chrome 的 `--app` 模式开无边框窗口，独立
-  user-data-dir，跟你平时的浏览器完全隔开。找不到就退回默认浏览器
-- **自动扫描**：启动时扫一次，之后按设定间隔在后台增量扫描
-- **设置页**：扫描目录、额外排除、正文索引开关与上限、自动扫描间隔、
-  外观（跟随系统 / 浅色 / 深色）、开机自启、创建快捷方式
-- **关于页**：版本与运行环境、索引体检 / 整理碎片 / 重建 / 清空、
-  快捷键一览、日志查看、退出与卸载
-- **首次运行引导**：说清楚它做什么、不做什么，并让你先确认扫描目录
-- **日志**：写到 `~/.shiyi/shiyi.log`，自动轮转留 3 份，未捕获异常也记
-- **检索增强**：分页加载、按相关/时间/大小排序、把结果导出成 CSV
-- **Windows 集成**：开机自启（HKCU Run 键）、桌面与开始菜单快捷方式、卸载
-- **图标**：用 GDI 把「拾」字画进位图再手写 ICO，七个尺寸，不依赖 Pillow
-- **打包**：`pyproject.toml`（`pip install -e .` 后有 `shiyi` 命令）、
-  PyInstaller 构建脚本、MIT 许可证
+### Added
+- **Application shell**: single instance (clicking the icon again raises the
+  window you already have, it never starts a second copy), tray residency,
+  closing the window doesn't quit, clean shutdown
+- **System tray**: pure ctypes against Win32, no pystray, no Pillow.
+  Left-click opens; right-click offers scan now / open index folder / view
+  logs / quit; a balloon reports what changed after a scan
+- **Application window**: Edge or Chrome in `--app` mode with an isolated
+  user-data directory, fully separate from your everyday browser. Falls back
+  to the default browser when neither is installed
+- **Automatic scanning**: once at startup, then on an interval, incrementally
+- **Settings screen**: scan roots, extra exclusions, body-text indexing and its
+  limit, scan interval, appearance (system / light / dark), start with Windows,
+  create shortcuts
+- **About screen**: version and environment, index check / compact / rebuild /
+  clear, keyboard reference, logs, quit and uninstall
+- **First-run guide**: states plainly what it does and what it won't, then asks
+  you to confirm the scan roots
+- **Logging** to `~/.shiyi/shiyi.log`, rotating, 3 files kept; uncaught
+  exceptions are recorded too — which is how the packaging bug below was found
+- **Search**: pagination, sort by relevance / time / size, CSV export
+- **Windows integration**: autostart via the HKCU Run key, desktop and start
+  menu shortcuts, uninstall
+- **Icon**: the 拾 glyph rendered through GDI into a bitmap, then an ICO
+  container written by hand — seven sizes, no Pillow
+- **Packaging**: `pyproject.toml` (a `shiyi` command after `pip install -e .`),
+  a PyInstaller build script, MIT license
 
-### 改进
-- 端口被占用时自动顺延，双击启动的人不会看见 traceback
-- 索引体检改成按钮触发：`PRAGMA quick_check` 在 400MB 的库上要好几秒，
-  不该每次打开「关于」都跑一遍
-- 外观和开机自启即时生效，不用再点保存；离开设置页不再用 confirm 拦人，
-  改成侧栏上点一个未保存的小圆点
-- 坏配置会被收进合理范围，不会让程序起不来
+### Changed
+- A busy port rolls forward to the next free one, so double-clicking never
+  produces a traceback
+- The index health check became opt-in: `PRAGMA quick_check` takes seconds on a
+  400 MB database and has no business running every time About is opened
+- Appearance and autostart apply immediately; leaving Settings no longer traps
+  you behind a `confirm()` — an unsaved-changes dot on the sidebar instead
+- A malformed config is clamped into range rather than preventing startup
 
-### 修复
-- 跳过聊天软件的私有数据库（`db_storage`、`.db-wal`、`.material` 等）——
-  一次就清掉了 3774 个不属于你的文件
+### Fixed
+- Skip messenger private databases (`db_storage`, `.db-wal`, `.material`) —
+  one pass removed 3,774 files that were never the user's to begin with
 
 ## 0.1.0 — 2026-09-10
 
-第一个能用的版本。
+The first version that worked.
 
-### 新增
-- 全盘扫描与增量索引：15 万文件约 90 秒，增量约 9 秒
-- 中文全文检索：FTS5 trigram，三字以上约 1ms；一到两个字回退成扫描正文
-- 正文抽取：docx / pptx / xlsx 直接解 OOXML；PDF 自己解 FlateDecode、
-  对象流和 ToUnicode CMap，再按坐标还原阅读顺序，不依赖 pypdf
-- 项目识别、版本堆积归并、正文指纹去重
-- 年鉴：把文件翻译成「你今年做了什么」，可导出成独立 HTML
-- 网页界面 + 命令行
+### Added
+- Full scan and incremental indexing: ~90 s for 150,000 files, ~9 s incremental
+- Chinese full-text search on SQLite FTS5 with the trigram tokenizer: ~1 ms for
+  three characters or more; one or two characters fall back to scanning body text
+- Text extraction: docx / pptx / xlsx parsed straight out of OOXML; PDF decoded
+  from scratch — FlateDecode, object streams, `/ToUnicode` CMaps, then
+  reading-order reconstruction from glyph coordinates. No pypdf
+- Project detection, version clustering, content-fingerprint deduplication
+- Yearbook: files translated into "what you made this year", exportable as a
+  single self-contained HTML page
+- Web interface and command line
 
-### 修复
-- 分块提交扫描任务，避免 15 万个任务一次性排队把内存吃光
-- 跳过 OneDrive 云端占位文件，不触发下载
-- 目录正文预算不对 docx / pptx / pdf 生效（压缩包体积 ≠ 字数）
-- HTTP/1.1 keep-alive 下先读完请求体再回 403
+### Fixed
+- Submit scan jobs in bounded chunks — `Executor.map` over 150,000 jobs queues
+  them all at once, and extraction outruns the database writer until memory
+  is gone
+- Skip OneDrive cloud placeholders instead of triggering a download for each
+- The per-directory text budget must not apply to docx / pptx / pdf — those are
+  zip containers where size says nothing about word count
+- Drain the request body before replying 403, or HTTP/1.1 keep-alive carries
+  the leftover bytes into the next request

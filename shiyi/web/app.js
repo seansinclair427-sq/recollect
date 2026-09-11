@@ -124,10 +124,20 @@ function applyTheme(theme) {
 /* ─────────────────────────────────────────────── 导航 */
 const VIEWS = ['search', 'projects', 'tidy', 'year', 'settings', 'about'];
 
-function showView(name) {
+function showView(name, fromHash) {
   // 不用 confirm 把人困在设置页。草稿留在内存里，回来还在，
   // 侧栏上点一个小圆点提醒还没保存就够了。
+  if (!VIEWS.includes(name)) name = 'search';
   S.view = name;
+  if (!fromHash) {
+    // 记在地址栏里：刷新还停在这一页，也能收藏。
+    // 查询串在前、hash 在后，顺序反了就成了 #tidy?q=… 这种畸形 URL。
+    try {
+      const u = new URL(location.href);
+      u.hash = name === 'search' ? '' : name;
+      history.replaceState(null, '', u);
+    } catch { /* 忽略 */ }
+  }
   $$('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + name));
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === name));
   if (name === 'projects') loadProjects();
@@ -161,7 +171,9 @@ async function runSearch(append) {
     if (id !== S.reqId) return;              // 旧请求晚到了，丢掉
     S.hits = append ? S.hits.concat(r.hits) : r.hits;
     S.more = r.more || r.hits.length === PAGE;
+    if (!append) syncUrl(q);
     renderResults(r, append);
+    if (!append && q && r.total) rememberQuery(q);
     renderHints();
   } catch (e) {
     $('#results').innerHTML = `<div class="empty"><b>出错了</b>${esc(e.message)}</div>`;
@@ -320,18 +332,41 @@ function hlBody(body) {
   } catch { return t; }
 }
 
-const HINTS = ['慧食安', '支教', '红绿灯', '商业企划书', '课表'];
+/* 「最近搜过的」比写死几个例子有用得多——例子只对写例子的人成立。
+   存在浏览器本地，不上传，也不进索引。 */
+const RECENT_KEY = 'shiyi.recent';
+const RECENT_MAX = 8;
+
+function loadRecent() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); }
+  catch { return []; }
+}
+
+function rememberQuery(q) {
+  q = (q || '').trim();
+  if (q.length < 2) return;
+  try {
+    const list = loadRecent().filter(x => x !== q);
+    list.unshift(q);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, RECENT_MAX)));
+  } catch { /* 隐私模式下写不进去，无所谓 */ }
+}
 
 function renderHints() {
   const old = $('#hintbar');
   if (old) old.remove();
   if ($('#q').value || !S.stats || !S.stats.files) return;
+
+  const recent = loadRecent();
   const bar = document.createElement('div');
   bar.id = 'hintbar';
   bar.className = 'hintbar';
-  bar.innerHTML = '<span>试试：</span>' +
-    HINTS.map(h => `<button data-h="${esc(h)}">${esc(h)}</button>`).join('');
-  // 一定要插在 .split 之前 —— .split 是 flex 行，塞进去会把结果列表挤到一边
+  bar.innerHTML = recent.length
+    ? '<span>最近搜过：</span>' +
+      recent.map(h => `<button data-h="${esc(h)}">${esc(h)}</button>`).join('') +
+      '<button id="clearRecent" class="ghost" title="清空">清空</button>'
+    : '<span>输入任意一个词，就能翻遍你写过的每一句话。中文两三个字通常最灵。</span>';
+
   const split = $('#view-search .split');
   split.parentElement.insertBefore(bar, split);
   $$('[data-h]', bar).forEach(b => b.onclick = () => {
@@ -339,6 +374,11 @@ function renderHints() {
     onType();
     $('#q').focus();
   });
+  const cl = $('#clearRecent', bar);
+  if (cl) cl.onclick = () => {
+    try { localStorage.removeItem(RECENT_KEY); } catch { /* 无所谓 */ }
+    renderHints();
+  };
 }
 
 async function exportSearch() {
@@ -923,6 +963,21 @@ function bindKeys() {
   });
 }
 
+/* 允许 ?q=... 直接带查询进来：搜索结果就能收藏、能发给别人。 */
+function queryFromUrl() {
+  try { return new URLSearchParams(location.search).get('q') || ''; }
+  catch { return ''; }
+}
+
+function syncUrl(q) {
+  try {
+    const u = new URL(location.href);
+    if (q) u.searchParams.set('q', q); else u.searchParams.delete('q');
+    u.hash = S.view === 'search' ? '' : S.view;
+    history.replaceState(null, '', u);
+  } catch { /* file:// 之类的场景，忽略 */ }
+}
+
 async function boot() {
   drawIcons();
   bindKeys();
@@ -947,6 +1002,18 @@ async function boot() {
   $$('.tabs button').forEach(b => b.onclick = () => showView(b.dataset.view));
   $$('.tidy-tabs button').forEach(b => b.onclick = () => { S.tidy = b.dataset.t; renderTidy(); });
   $('#btnScan').onclick = () => startScan();
+
+  // 地址栏里带了什么就从哪儿开始：#tidy 直接落在整理页，?q= 直接带着查询
+  const startView = (location.hash || '').replace('#', '');
+  if (startView && startView !== 'search') showView(startView, true);
+  window.addEventListener('hashchange', () =>
+    showView((location.hash || '').replace('#', ''), true));
+
+  const initial = queryFromUrl();
+  if (initial) {
+    $('#q').value = initial;
+    $('#qclear').classList.remove('hidden');
+  }
 
   await loadStats();
   await runSearch();

@@ -1,278 +1,293 @@
-# 拾遗
+<div align="center">
 
-**把散落在硬盘里的每一件东西找回来。**
+<img src="docs/icon.png" width="76" alt="Shiyi">
 
-一个跑在你自己电脑上的作品档案馆。它把你写过的所有 Word、PPT、Excel、PDF、
-代码和笔记读进一个本地索引，然后让你用一句话把它们找出来——不是找文件名，
-是找**你当时写下的那句话**。
+# Recollect · 拾遗
 
-它还会告诉你两件你大概不知道的事：
+**Find every single thing you ever made, scattered across your disk.**
 
-- 同一件东西你存了几个版本（`OverWeather_v3 / v3.2 / v4`）
-- 哪些文件改了名字，内容其实一模一样
+A local archive that reads the *text inside* your Word, PowerPoint, Excel, PDF,
+code and notes — so you can search for the sentence you wrote,
+not just the filename you forgot.
 
-零依赖、零联网、零账号。只读你的文件，从不改动它们。
+No cloud. No account. No network. Reads your files, never changes them.
 
-<br>
+[简体中文](README.zh-CN.md) · [Changelog](CHANGELOG.md) · [Android app](android/README.md)
 
-## 装上它
+</div>
 
-**方式一：直接用（不需要 Python）**
+---
 
-双击 `打包成exe.bat` 生成 `dist\拾遗\拾遗.exe`，之后双击这个 exe 就行。
-也可以把整个 `dist\拾遗` 文件夹拷到别的电脑上用。
+![Search](docs/desktop-search.png)
 
-**方式二：有 Python 的话**
+## What it does
 
-```bash
-pip install -e .        # 之后就有 shiyi 命令
-shiyi                   # 启动（托盘 + 窗口）
-```
+Most search tools match filenames. Recollect indexes the **body text**:
 
-或者直接双击 `启动拾遗.bat`。
+- Search `红绿灯` and it finds the phrase inside a `.pptx`, telling you it's on slide 3
+- Search a term from a 120,000-character exam PDF and it lands on that PDF
+- Type two Chinese characters — the case where trigram indexes give up — and it still works
 
-**把它放到桌面和开始菜单**：双击 `安装快捷方式.bat`，或在软件里
-「设置 → 系统 → 创建桌面和开始菜单快捷方式」。
+It also tells you two things you probably don't know about your own disk:
 
-需要 Python 3.10 以上（用 exe 的话什么都不需要）。
-
-<br>
-
-## 它怎么待着
-
-启动后它在**系统托盘**里常驻，图标是一枚朱砂色的「拾」印。
-
-- **左键点图标** —— 打开窗口
-- **右键点图标** —— 立即扫描 / 打开索引目录 / 查看日志 / 退出
-- **关掉窗口** —— 不退出，继续待在托盘里，随时能搜
-- **再点一次桌面图标** —— 唤起已经开着的那个，不会起第二份
-
-窗口用 Edge 或 Chrome 的 `--app` 模式打开：没有地址栏、没有标签页，
-用的是独立配置目录，跟你平时的浏览器完全隔开——不共享 Cookie、
-不进浏览历史、关掉也不影响你原来开的网页。找不到 Edge/Chrome 就退回默认浏览器。
-
-它每隔一小时（可调）在后台做一次增量扫描，15 万文件大约 9 秒，你不用记得点。
-
-<br>
-
-## 六个页面
-
-### 检索
-
-搜什么都行。搜「鸭子坐」会翻出你三个月前写的那篇分析，哪怕它藏在
-`temp.docx` 里；搜「果蝇」会命中一份 12 万字的生物试卷 PDF 的正文。
-
-| 快捷键 | |
+| | |
 |---|---|
-| `/` | 跳到搜索框 |
-| `↑` `↓` | 在结果里移动 |
-| `Enter` | 用默认程序打开 |
-| `Shift`+`Enter` | 在文件夹中显示 |
-| `Esc` | 清空搜索 |
-| `Ctrl`+`1..4` | 切换页面 |
+| **Version pile-ups** | You kept `report.docx`, `report-revised.docx`, `report-final.docx`. It groups them, marks the newest, and tells you what you'd reclaim by keeping one |
+| **Content duplicates** | Files with different names but byte-identical text — the same deck sitting in three folders |
 
-右侧能直接读全文，PPT 会标出在第几页。可以按相关度/时间/大小排序，
-可以只看某一类文件，可以把结果导出成 CSV 放到桌面。
-
-三个字以上走 trigram 索引，通常 **1 毫秒**；一到两个字（「课表」「支教」
-这种）索引用不上，改成直接扫正文，约 140 毫秒。
-
-### 项目
-
-从几万个目录里认出哪些是「一个项目」——有 `package.json`、`build.gradle`、
-`.ino`、`.git` 的地方。安卓工程会在三层目录留下标记，只取最外层那个。
-
-解压包和安装目录会被标灰：它们的所有文件修改时间挤在同一小时里，
-一看就是被一次性写出来的，不是你一点点做出来的。
-
-### 整理
-
-- **版本堆积**：同一件东西的多个版本，标出最新的那份，算出只留一份能省多少
-- **内容重复**：正文指纹完全相同的文件，哪怕名字不一样
-- **很久没碰**：曾经投入不少、最近半年没动过的项目
-
-**只看你自己的目录。** 下载目录、微信 / QQ 的文件缓存、网盘临时目录、
-以及模组和工具链自带的文件，都不参与统计——钢铁雄心模组里 38 个同名
-`documentation.md` 不是「你存了 38 版」，微信缓存里 20 份课程表也不是。
-加上这条规则后，版本堆积从 630 组降到 4 组，每一组都是真的。
-
-例外是内容重复：只要有一份在你自己的文件夹里，这组就会列出来，
-并把缓存里的那份一起显示——「同一个 PPT 在项目里、OneDrive 里、
-微信里各躺一份，加起来 212MB」正是该指出来的事。
-
-拾遗**不会**替你删任何东西。它只负责把事实摆出来，删不删你自己决定。
-
-### 年鉴
-
-把「一堆文件」翻译成「你今年做了什么」：动过多少文件、做出多少件成品、
-写了多少万字、最忙的是哪个月、最活跃的项目是哪几个。
-
-`gradle-wrapper.jar` 和 `node.exe` 不算作品，你自己编的 `.apk` 算。
-可以导出成一页独立 HTML，`Ctrl+P` 就能存成 PDF——报名、答辩、履历都用得上。
-
-### 设置
-
-扫描目录、额外排除项、要不要索引正文、自动扫描间隔、外观（跟随系统 /
-浅色 / 深色）、开机自启、创建快捷方式。
-
-外观和开机自启点了立刻生效；其余改动点「保存」才算数，没保存时侧栏上
-会有个小圆点提醒你。
-
-### 关于
-
-版本与运行环境、索引体检、快捷键一览、日志、退出与卸载。
-
-索引维护有四个动作：**体检**（跑一遍 SQLite 完整性检查）、**整理碎片**
-（回收删掉文件留下的空间）、**重建**（清空后重读一遍）、**清空**。
-无论哪个都不会动你的原始文件。
+It **never deletes anything**. It lays out the facts; what to remove is your call.
 
 <br>
 
-## 手机上也有一个
+## Install
 
-`android/` 里是**拾遗的安卓版**——同一个东西、同一套设计语言，
-读你手机里的 Word、PPT、Excel 和笔记的正文。
+**Windows, no Python required**
 
-编译好的包在 `release/拾遗-安卓版-1.0.0.apk`（1.1 MB），传到手机点开即装。
+Double-click `打包成exe.bat` to produce `dist/拾遗/拾遗.exe` (~24 MB), then run it.
+The whole `dist/拾遗` folder is portable — copy it to another machine and it works.
 
-用安卓的 SAF 授权，只能看到你亲手选的文件夹，刻意不要「全盘访问」权限。
-手机版不解析 PDF 正文（那套 CMap 解析在手机上不划算），界面里会如实标明。
-
-细节见 [android/README.md](android/README.md)。
-
-<br>
-
-## 命令行
-
-装过之后有 `shiyi` 命令；没装就用 `python -m shiyi`。
+**With Python 3.10+**
 
 ```bash
-shiyi                      # 当软件启动（托盘 + 窗口）
-shiyi doctor               # 自检：环境、索引、配置。出问题先跑这个
-shiyi doctor --deep        # 连数据库完整性一起查
+pip install -e .
+shiyi                 # starts in the tray, opens a window
+```
 
-shiyi scan                 # 扫描（增量）
-shiyi scan --full          # 忽略缓存，全部重读
-shiyi search 慧食安         # 检索
-shiyi projects             # 列出项目
-shiyi clusters             # 版本堆积
-shiyi dups                 # 内容重复
-shiyi year 2026            # 年鉴
-shiyi export 2026          # 把年鉴导出成 HTML
+**Android** — grab `app-release.apk` (1.1 MB) from
+[Releases](../../releases), or see [android/README.md](android/README.md).
 
-shiyi install              # 创建桌面和开始菜单快捷方式
-shiyi install --autostart  # 顺便设开机自启
-shiyi autostart on|off     # 单独管开机自启
-shiyi uninstall            # 删快捷方式和自启（--purge 连索引一起删）
+<br>
 
-shiyi serve                # 只起网页服务，不进托盘
-shiyi log                  # 打印最近日志
-shiyi where                # 索引存在哪
-shiyi reset                # 清空索引
+## How it lives on your machine
+
+It sits in the **system tray** as a vermillion 拾 seal.
+
+- **Left-click** the icon — open the window
+- **Right-click** — scan now / open the index folder / view logs / quit
+- **Close the window** — it doesn't quit; it stays in the tray, ready
+- **Click the desktop icon again** — raises the window you already have open,
+  it never starts a second copy
+
+The window opens through Edge or Chrome's `--app` mode: no address bar, no tabs,
+and a **separate user-data directory** so it shares nothing with your everyday
+browser — no cookies, no history, and closing it doesn't touch your open pages.
+Falls back to the default browser if neither is installed.
+
+Every hour (configurable) it runs an incremental scan in the background.
+150,000 files takes about 9 seconds, so you never have to remember to refresh.
+
+<br>
+
+## Six screens
+
+### Search
+
+`/` focuses the box · `↑ ↓` moves · `Enter` opens · `Shift+Enter` reveals in the
+file manager · `Esc` clears · `Ctrl+1..4` switches screens.
+
+The right pane reads the full extracted text; slides are marked page by page.
+Sort by relevance, time or size; filter by kind; export results to CSV.
+
+Queries of three characters or more go through the trigram index — typically
+**1 ms**. One or two characters can't form a trigram, so those fall back to a
+direct scan of the body text, around **140 ms**.
+
+Searches are deep-linkable: `?q=红绿灯` and `#tidy` both work, so a result set or
+a screen can be bookmarked and shared.
+
+### Projects
+
+Picks out which directories are actually *a project* — the ones with a
+`package.json`, `build.gradle`, `.ino`, or `.git`. An Android project leaves
+markers at three nesting levels; only the outermost one counts.
+
+Unpacked archives and installers are dimmed. Their files all share one
+modification hour, which means they were written in a single burst — not built
+by a person over time.
+
+### Tidy
+
+![Tidy](docs/desktop-tidy.png)
+
+Version pile-ups, content duplicates, and projects you once invested in but
+haven't touched in months.
+
+**Your directories only.** Downloads, messenger file caches, cloud-sync temp
+folders, and files shipped with game mods or toolchains are all excluded —
+38 identically-named `documentation.md` files inside a game mod are not "38
+versions you saved", and neither are 20 copies of a timetable in a chat cache.
+Adding that one rule took version pile-ups from 630 groups down to 4, every one
+of them real.
+
+### Yearbook
+
+Translates a pile of files into *what you made this year*: how many artifacts,
+how many words, the busiest month, the most active projects. Exports as a
+single self-contained HTML page — `Ctrl+P` turns it into a PDF.
+
+`gradle-wrapper.jar` and `node.exe` don't count as your work. An `.apk` you
+built yourself does.
+
+### Settings
+
+Scan roots, extra exclusions, whether to index body text and up to what length,
+auto-scan interval, appearance (system / light / dark), start with Windows,
+create shortcuts.
+
+Appearance and autostart apply immediately. Everything else needs **Save**, and
+until you do there's a small dot on the sidebar reminding you.
+
+### About
+
+Version and environment, index health check, keyboard reference, logs, quit and
+uninstall. Index maintenance offers **check**, **compact**, **rebuild** and
+**clear** — none of which touch your original files.
+
+<br>
+
+## On your phone
+
+<img src="docs/android-search.png" width="250"> <img src="docs/android-detail.png" width="250">
+
+The same thing, on Android — see [android/README.md](android/README.md).
+
+<br>
+
+## Command line
+
+```bash
+shiyi                      # run as an app (tray + window)
+shiyi doctor               # self-check: environment, index, config
+shiyi doctor --deep        # include a SQLite integrity check
+
+shiyi scan                 # incremental scan
+shiyi scan --full          # ignore the cache, re-read everything
+shiyi search <query>       # search
+shiyi projects             # list detected projects
+shiyi clusters             # version pile-ups
+shiyi dups                 # content duplicates
+shiyi year 2026            # yearbook
+shiyi export 2026          # export the yearbook as HTML
+
+shiyi install              # desktop + start menu shortcuts
+shiyi install --autostart  # …and start with Windows
+shiyi autostart on|off
+shiyi uninstall            # remove shortcuts and autostart (--purge drops the index)
+
+shiyi serve                # web service only, no tray
+shiyi log / where / reset
 ```
 
 <br>
 
-## 它扫哪里
+## What it scans, and what it refuses to
 
-默认是 `Documents`、`Desktop`、`Downloads`、`OneDrive`，在「设置」里可以增删。
+Default roots: `Documents`, `Desktop`, `Downloads`, `OneDrive`. Editable in Settings.
 
-**不会碰的地方**：`node_modules`、`.git`、`AppData`、各种 `build`/`dist`、
-Minecraft 的 `versions`/`libraries`、聊天软件的私有数据库（`db_storage`、
-`.db-wal`、`.material` 这些），以及你自己加的排除项。
+**Never walked**: `node_modules`, `.git`, `AppData`, `build`/`dist`, Minecraft's
+`versions`/`libraries`, messenger private databases (`db_storage`, `.db-wal`,
+`.material`), plus anything you exclude yourself.
 
-**云端文件**：OneDrive 里没下载到本地的占位文件只记录文件名，绝不打开——
-否则扫一遍等于把整个网盘拖下来（你的 OneDrive 有 78% 是这种文件）。
+**Cloud placeholders**: OneDrive files that aren't downloaded locally are indexed
+by name only and never opened — opening one triggers a download, and on the
+machine this was built for 78% of OneDrive files were placeholders. Scanning
+naively would have pulled the entire drive down.
 
-**大堆纯文本**：一个目录里塞了 4MB 以上裸文本（游戏模组的语言文件、
-工具链自带的文档、Python 标准库的测试用例），只索引文件名不抽正文。
-这条规则刻意不适用于 docx / pptx / pdf——那些是压缩包，体积大不代表字多，
-早期版本按体积算，把整个「期中复盘」文件夹误伤过一次。
-
-<br>
-
-## 关于 PDF
-
-没有装 pypdf 或者 MuPDF，PDF 正文是自己解出来的：解 FlateDecode、
-展开对象流、解析 `/ToUnicode` CMap 拿到码位到字符的映射、跑一个小型
-PostScript 词法器抓取绘字指令，再按文字在页面上的坐标重排成阅读顺序。
-
-Word / PowerPoint / LaTeX 导出的中文 PDF 都能读。**扫描件读不出来**——
-那是一张张图片，没有文字层，界面上会如实标成「扫描件，无正文」而不是
-假装成功。那 20 份学生个人档案就是这种。
+**Bulk plain text**: a directory holding more than 4 MB of raw text (game mod
+language files, toolchain docs, a bundled Python's test suite) gets filenames
+indexed but no body extraction. This rule deliberately does **not** apply to
+docx/pptx/pdf — those are zip containers where file size says nothing about word
+count. An earlier version measured by size and wiped out a legitimate folder of
+exam papers.
 
 <br>
 
-## 数据在哪
+## About the PDF reader
+
+There's no pypdf and no MuPDF here. PDF text is extracted from scratch:
+inflate `FlateDecode` streams, expand object streams, parse the `/ToUnicode`
+CMap into a code-point → character table, run a small PostScript tokenizer over
+the content stream to catch the text-showing operators, then re-sort the
+fragments by their position on the page into reading order.
+
+Chinese PDFs exported from Word, PowerPoint or LaTeX all read fine.
+**Scans do not** — they're images with no text layer, and the UI says exactly
+that rather than pretending it succeeded.
+
+<br>
+
+## Where your data lives
 
 ```
 %USERPROFILE%\.shiyi\
-  shiyi.db        索引（15 万个文件约 420MB）
-  config.json     配置
-  shiyi.log       日志（自动轮转，最多留 3 份）
-  runtime.json    正在运行的端口和令牌
-  window\         应用窗口的独立浏览器配置
+  shiyi.db        the index (~420 MB for 150,000 files)
+  config.json     settings
+  shiyi.log       rotating log, 3 files kept
+  runtime.json    the port and token of the running instance
+  window\         the app window's isolated browser profile
 ```
 
-删掉整个目录就等于卸载。你的原始文件一个字节都不会变。
+Delete that folder and it's as if the app was never installed.
+Not one byte of your original files changes.
 
 <br>
 
-## 它不会做的事
+## What it will never do
 
-- 不联网，不上传，不需要账号或 API key
-- 不删除、不移动、不重命名你的任何文件
-- 不给扫描件做 OCR（读不出来就说读不出来）
-- 服务只监听 `127.0.0.1`，有副作用的接口都要带启动时生成的一次性 token，
-  别的网页打不到你的本地端口；能打开的路径必须已经在索引里
+- Go online, upload anything, or ask for an account or API key
+- Delete, move or rename any of your files
+- OCR a scan (if it can't read it, it says so)
+- Listen on anything but `127.0.0.1`. Side-effecting endpoints require a
+  one-time token generated at startup, so no other web page can reach them, and
+  the only paths it can open are ones already in the index
 
 <br>
 
-## 出问题了
+## Troubleshooting
 
-先跑 `shiyi doctor`，它会把环境、索引、配置都查一遍。
-再看 `~/.shiyi/shiyi.log`（软件里「关于 → 日志」也能直接看）。
+Run `shiyi doctor` first — it checks environment, index and config in one shot.
+Then read `~/.shiyi/shiyi.log` (also visible under About → Logs).
 
-常见情况：
-
-| 症状 | 原因 |
+| Symptom | Cause |
 |---|---|
-| 中文搜不到 | `doctor` 里看 FTS5 那行；trigram 不可用的话得换个 Python |
-| 窗口没弹出来 | 没装 Edge/Chrome，会退回默认浏览器；也可能被拦截了 |
-| 端口被占 | 会自动往后挪，`runtime.json` 里能看到实际端口 |
-| 双击没反应 | 多半已经在托盘里跑着了，找那枚「拾」印 |
+| Chinese search finds nothing | Check the FTS5 line in `doctor`; without trigram you need a different Python |
+| No window appeared | No Edge/Chrome — it falls back to the default browser |
+| Port in use | It moves to the next free port; `runtime.json` has the real one |
+| Double-click does nothing | It's already in the tray — look for the 拾 seal |
 
 <br>
 
-## 开发
+## Development
 
 ```bash
-python -m unittest discover -s tests    # 71 个测试
-python tools/make_icon.py               # 重新生成图标
-python tools/build_exe.py               # 打包（--onefile 出单文件）
+python -m unittest discover -s tests   # 71 tests
+python tools/make_icon.py              # regenerate the icon
+python tools/build_exe.py              # package (--onefile for a single exe)
 ```
 
-测试覆盖正文抽取、PDF 的 CMap 与版面还原、中文检索的两条路径、
-增量扫描与删除、版本聚簇的边界（24 个 README 不算「版本堆积」）、
-配置的容错、单实例、索引维护、年鉴的 HTML 转义，
-以及一个真跑起来的服务端：无 token / 错 token / 跨源请求要被拒，
-索引外的路径不许打开，目录穿越要 404。
+Tests cover text extraction, PDF CMap parsing and layout reconstruction, both
+Chinese search paths, incremental scan and deletion, the edges of version
+clustering (24 READMEs are not a "version pile-up"), config tolerance, single
+instance, index maintenance, yearbook HTML escaping — plus a real running
+server: missing/wrong token and cross-origin requests must be rejected, paths
+outside the index must not open, and directory traversal must 404.
 
-代码结构：
-
-| 文件 | 干什么 |
+| File | Role |
 |---|---|
-| `app.py` | 应用外壳：单实例、托盘、窗口、定时扫描 |
-| `server.py` | 本地 HTTP 服务与 JSON 接口 |
-| `scan.py` | 扫描与增量索引 |
-| `store.py` | SQLite + FTS5，检索与维护 |
-| `textract.py` | docx / pptx / xlsx / 文本抽取 |
-| `pdftext.py` | 纯标准库 PDF 正文抽取 |
-| `projects.py` | 项目识别、版本聚簇、重复检测 |
-| `timeline.py` | 时间线与年鉴统计 |
-| `report.py` | 年鉴 HTML 导出 |
-| `tray.py` | Win32 托盘（纯 ctypes） |
-| `window.py` | 应用窗口 |
-| `winintegration.py` | 开机自启、快捷方式、卸载 |
+| `app.py` | Application shell: single instance, tray, window, scheduled scan |
+| `server.py` | Local HTTP service and JSON API |
+| `scan.py` | Walking and incremental indexing |
+| `store.py` | SQLite + FTS5, search and maintenance |
+| `textract.py` | docx / pptx / xlsx / plain-text extraction |
+| `pdftext.py` | PDF text extraction, standard library only |
+| `projects.py` | Project detection, version clustering, duplicate detection |
+| `timeline.py` | Timeline and yearbook statistics |
+| `report.py` | Yearbook HTML export |
+| `tray.py` | Win32 tray icon, pure ctypes |
+| `window.py` | Application window |
+| `winintegration.py` | Autostart, shortcuts, uninstall |
 
-MIT 许可证。
+Zero runtime dependencies is a design goal, not an omission.
+PyInstaller is needed only to build the executable.
+
+MIT License.

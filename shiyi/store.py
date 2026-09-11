@@ -163,7 +163,7 @@ def search(con, q: str, *, kind: str = "", root: str = "", project_id=None,
         if recent_work and not kind:
             ph = ",".join("?" * len(RECENT_KINDS))
             base += " AND (f.kind IN (%s) OR f.ext IN ('.apk','.ipa'))" % ph
-            base += " AND f.size > 4096"
+            base += " AND f.size > 1024"   # 只挡零碎，别误伤短文档
             pre = list(RECENT_KINDS)
         sel = "f.*, '' AS snip, 0 AS score"
         osql = ORDERS.get(order, "f.mtime DESC")

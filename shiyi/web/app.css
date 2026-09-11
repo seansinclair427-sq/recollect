@@ -674,3 +674,5 @@ h2.sec .mini-btn{margin-left:auto}
 .panel .card:nth-child(5){--i:4}
 .panel .card:nth-child(6){--i:5}
 .panel .card:nth-child(7){--i:6}
+.hintbar button.ghost{border-color:transparent;color:var(--faint);padding:4px 8px}
+.hintbar button.ghost:hover{border-color:var(--line-2);color:var(--ink-2);background:none}
