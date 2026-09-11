@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- 索引是可再生的，没必要占用户的云备份额度 -->
+    <exclude domain="database" path="shiyi.db" />
+</full-backup-content>

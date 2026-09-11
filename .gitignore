@@ -10,5 +10,10 @@
 Thumbs.db
 __pycache__/
 _preview.html
+android/.gradle/
+android/app/build/
+android/app/shiyi.jks
+android/build/
+android/local.properties
 build/
 dist/
