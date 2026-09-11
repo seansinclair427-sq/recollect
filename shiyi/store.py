@@ -128,8 +128,14 @@ ORDERS = {"new": "f.mtime DESC", "old": "f.mtime ASC", "big": "f.size DESC"}
 MARK_A, MARK_B = "\x02", "\x03"
 
 
+# 空查询时默认只列这些：打开软件第一眼该看到「你最近在做什么」，
+# 而不是被系统碰过的 .lnk 和 .gitignore。
+RECENT_KINDS = ("doc", "slide", "sheet", "pdf")
+
+
 def search(con, q: str, *, kind: str = "", root: str = "", project_id=None,
-           limit: int = 60, offset: int = 0, order: str = "relevance") -> dict:
+           limit: int = 60, offset: int = 0, order: str = "relevance",
+           recent_work: bool = False) -> dict:
     """全文 + 文件名检索。返回 {total, hits, mode}。
 
     三条路：
@@ -153,9 +159,15 @@ def search(con, q: str, *, kind: str = "", root: str = "", project_id=None,
 
     if not q:
         base = "FROM files f WHERE 1"
+        pre = []
+        if recent_work and not kind:
+            ph = ",".join("?" * len(RECENT_KINDS))
+            base += " AND (f.kind IN (%s) OR f.ext IN ('.apk','.ipa'))" % ph
+            base += " AND f.size > 4096"
+            pre = list(RECENT_KINDS)
         sel = "f.*, '' AS snip, 0 AS score"
         osql = ORDERS.get(order, "f.mtime DESC")
-        return _run(con, sel, base, cond, [], args, osql, limit, offset, "list")
+        return _run(con, sel, base, cond, pre, args, osql, limit, offset, "list")
 
     fq = _fts_query(q)
     if fq:

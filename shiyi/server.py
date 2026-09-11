@@ -202,6 +202,7 @@ class Handler(BaseHTTPRequestHandler):
                 limit=min(200, self._int("limit", 40)),
                 offset=self._int("offset", 0),
                 order=self._arg("order", "relevance"),
+                recent_work=self._arg("recent") == "1",
             )
             res["ms"] = round((time.time() - t0) * 1000, 1)
             return self._json(res)

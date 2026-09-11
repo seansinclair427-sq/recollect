@@ -53,6 +53,10 @@ const KIND_CN = { doc: '文档', slide: '幻灯', sheet: '表格', pdf: 'PDF', c
                   image: '图片', video: '视频', audio: '音频', archive: '压缩包',
                   app: '程序', font: '字体', other: '其他' };
 
+/* 你写的东西排前面，机器产生的排后面。按数量排会让「其他 10 万」霸占第一格。 */
+const KIND_ORDER = ['doc', 'slide', 'pdf', 'sheet', 'code', 'image',
+                    'video', 'audio', 'archive', 'app', 'font', 'other'];
+
 const ICONS = {
   search: '<circle cx="7.5" cy="7.5" r="5.5"/><path d="M11.6 11.6 15 15"/>',
   grid: '<rect x="2" y="2" width="5.4" height="5.4" rx="1"/><rect x="9.6" y="2" width="5.4" height="5.4" rx="1"/><rect x="2" y="9.6" width="5.4" height="5.4" rx="1"/><rect x="9.6" y="9.6" width="5.4" height="5.4" rx="1"/>',
@@ -150,6 +154,8 @@ async function runSearch(append) {
   const p = new URLSearchParams({ q, limit: String(PAGE), offset: String(S.offset),
                                   order: S.sort });
   if (S.kind) p.set('kind', S.kind);
+  // 没输入内容时只列「作品」，不列 .lnk / .gitignore 这类系统碎屑
+  if (!q && !S.kind) p.set('recent', '1');
   try {
     const r = await api('search?' + p);
     if (id !== S.reqId) return;              // 旧请求晚到了，丢掉
@@ -167,24 +173,28 @@ function renderResults(r, append) {
   const shown = S.hits.length;
   $('#resultMeta').textContent = S.q
     ? `${r.total}${r.more ? '+' : ''} 条结果 · ${r.ms}ms`
-    : `最近改动的 ${shown} 个文件`;
+    : (S.kind ? `最近改动的 ${shown} 个${KIND_CN[S.kind] || ''}`
+               : `最近动过的 ${shown} 件作品`);
   $('#modeTag').textContent = { fts: '索引', like: '扫描正文', list: '' }[r.mode] || '';
 
   if (!shown) {
     list.innerHTML = S.q
       ? `<div class="empty"><b>没找到「${esc(S.q)}」</b>
            试试更短的词，或换一个说法。中文两三个字通常最灵。</div>`
-      : `<div class="empty"><b>索引还是空的</b>
-           点左下角「重新扫描」，或到「设置」里选好要扫的目录。</div>`;
-    $('#detail').innerHTML = '';
+      : `<div class="empty"><b>${S.stats && S.stats.files ? '最近没有动过的作品' : '索引还是空的'}</b>
+           ${S.stats && S.stats.files
+             ? '上面输入任意一个词，就能翻遍你写过的每一句话。'
+             : '点左下角「重新扫描」，或到「设置」里选好要扫的目录。'}</div>`;
+    $('#detail').innerHTML = DETAIL_IDLE;
     $('#more').classList.add('hidden');
     return;
   }
 
-  const html = S.hits.slice(append ? shown - r.hits.length : 0).map((h, i) => {
-    const idx = (append ? shown - r.hits.length : 0) + i;
+  const base = append ? shown - r.hits.length : 0;
+  const html = S.hits.slice(base).map((h, i) => {
+    const idx = base + i;
     return `
-    <li class="hit" data-i="${idx}">
+    <li class="hit fresh" data-i="${idx}" style="--i:${Math.min(i, 14)}">
       <div class="hit-top">
         <span class="tag ${esc(h.kind)}">${KIND_CN[h.kind] || h.kind}</span>
         <span class="hit-name">${hl(markName(h.name))}</span>
@@ -196,8 +206,14 @@ function renderResults(r, append) {
   }).join('');
 
   if (append) list.insertAdjacentHTML('beforeend', html);
-  else list.innerHTML = html;
+  else { list.innerHTML = html; list.scrollTop = 0; }
   $('#more').classList.toggle('hidden', !S.more);
+
+  // 入场动画只放一次。不摘掉 fresh，后面重排会再抖一遍。
+  setTimeout(() => $$('.hit.fresh', list).forEach(el => el.classList.remove('fresh')), 700);
+
+  // 自动选中第一条：右边那半屏本来就该有东西，顺手也省一次点击
+  if (!append && S.hits.length && S.sel < 0) select(0, true);
 }
 
 /* 文件名里的命中自己标 —— 后端的 snippet 只覆盖正文 */
@@ -209,18 +225,37 @@ function markName(name) {
          MK_B + name.slice(i + S.q.length);
 }
 
-function select(i) {
+function select(i, quiet) {
   if (i < 0 || i >= S.hits.length) return;
   S.sel = i;
   $$('.hit').forEach((el, k) => el.classList.toggle('sel', k === i));
-  const el = $$('.hit')[i];
-  if (el) el.scrollIntoView({ block: 'nearest' });
+  if (!quiet) {
+    const el = $$('.hit')[i];
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
   showDetail(S.hits[i].id);
 }
 
+const DETAIL_IDLE = `
+  <div class="d-idle">
+    <span class="mark"><svg viewBox="0 0 17 17" fill="none" stroke="currentColor"
+      stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
+      style="width:20px;height:20px"><path d="M3.5 2h6l4 4v9a.5.5 0 0 1-.5.5H3.5
+      a.5.5 0 0 1-.5-.5v-13A.5.5 0 0 1 3.5 2z"/><path d="M9.5 2v4h4"/></svg></span>
+    <p>选中左边任意一条<br>这里会显示它的全文</p>
+  </div>`;
+
+const DETAIL_SKELETON = `
+  <div class="skel" style="padding-top:4px">
+    <i class="w2" style="height:17px"></i><i class="w3"></i>
+    <i style="margin-top:22px;height:34px"></i>
+    <i class="w1" style="margin-top:22px"></i><i class="w3"></i>
+    <i class="w2"></i><i class="w3"></i><i class="w1"></i>
+  </div>`;
+
 async function showDetail(id) {
   const d = $('#detail');
-  d.innerHTML = '<div class="empty"><span class="spin"></span>读取中…</div>';
+  d.innerHTML = DETAIL_SKELETON;
   let f;
   try { f = await api('file/' + id); }
   catch (e) { d.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
@@ -318,11 +353,20 @@ async function exportSearch() {
   btn.disabled = false;
 }
 
+/* 读取中给个形状，比转圈更安定，也不会让版面跳动 */
+const skeletonRows = n => Array.from({ length: n }, (_, i) =>
+  `<div class="skel" style="--i:${i}"><i class="w2" style="height:15px"></i>
+   <i class="w3"></i><i class="w1"></i></div>`).join('');
+const skeletonCards = n =>
+  Array.from({ length: n }, () =>
+    `<div class="pcard" style="pointer-events:none"><div class="skel" style="padding:0">
+     <i class="w2" style="height:15px"></i><i class="w3"></i><i class="w1"></i></div></div>`).join('');
+
 /* ─────────────────────────────────────────────── 项目 */
 async function loadProjects(force) {
   const grid = $('#projectGrid');
   if (!S.projects || force) {
-    grid.innerHTML = '<div class="empty"><span class="spin"></span>整理中…</div>';
+    grid.innerHTML = skeletonCards(6);
     S.projects = (await api('projects')).projects;
   }
   renderProjects();
@@ -337,8 +381,9 @@ function renderProjects() {
     grid.innerHTML = '<div class="empty">没有匹配的项目。</div>';
     return;
   }
-  grid.innerHTML = rows.map(p => `
-    <div class="pcard${p.unpacked || p.third_party ? ' dim' : ''}" data-path="${esc(p.path)}">
+  grid.innerHTML = rows.map((p, i) => `
+    <div class="pcard${p.unpacked || p.third_party ? ' dim' : ''}"
+         data-path="${esc(p.path)}" style="--i:${Math.min(i, 18)}">
       <h3>${esc(p.name)}</h3>
       <div class="ppath">${esc(p.path)}</div>
       <div class="prow">
@@ -369,7 +414,7 @@ function renderProjects() {
 async function loadTidy(force) {
   const body = $('#tidyBody');
   if (!S.tidyData.clusters || force) {
-    body.innerHTML = '<div class="empty"><span class="spin"></span>比对中…</div>';
+    body.innerHTML = skeletonRows(5);
     const [c, d, t] = await Promise.all([api('clusters'), api('duplicates'), api('timeline')]);
     S.tidyData = { clusters: c.clusters, dups: d.groups, stale: t.stale };
   }
@@ -377,9 +422,9 @@ async function loadTidy(force) {
   const waste = clusters.reduce((a, c) => a + c.waste, 0) +
                 dups.reduce((a, g) => a + g.bytes - (g.bytes / g.count), 0);
   $('#tidySummary').innerHTML = `
-    <div><b>${clusters.length}</b><span>组版本堆积</span></div>
-    <div><b>${dups.length}${dups.length >= 120 ? '+' : ''}</b><span>组内容重复</span></div>
-    <div><b>${size(waste)}</b><span>只留一份可省下</span></div>`;
+    <div style="--i:0"><b>${clusters.length}</b><span>组版本堆积</span></div>
+    <div style="--i:1"><b>${dups.length}${dups.length >= 120 ? '+' : ''}</b><span>组内容重复</span></div>
+    <div style="--i:2"><b>${size(waste)}</b><span>只留一份可省下</span></div>`;
   renderTidy();
 }
 
@@ -390,7 +435,7 @@ function renderTidy() {
   if (S.tidy === 'clusters') {
     const cs = S.tidyData.clusters;
     body.innerHTML = cs.length ? cs.map((c, i) => `
-      <div class="grp">
+      <div class="grp" style="--i:${Math.min(i, 14)}">
         <div class="grp-h" data-g="${i}">
           <h4>${esc(c.title)}</h4>
           <span class="badge">${c.count} 份</span>
@@ -407,8 +452,8 @@ function renderTidy() {
       : '<div class="empty"><b>没有版本堆积</b>难得。</div>';
   } else if (S.tidy === 'dups') {
     const gs = S.tidyData.dups;
-    body.innerHTML = gs.length ? gs.map(g => `
-      <div class="grp">
+    body.innerHTML = gs.length ? gs.map((g, i) => `
+      <div class="grp" style="--i:${Math.min(i, 14)}">
         <div class="grp-h">
           <h4>${esc(g.members[0].name)}</h4>
           <span class="badge">${esc(g.label)} ${g.count} 份</span>
@@ -456,7 +501,7 @@ async function loadYear() {
   $$('#yearPick button').forEach(b => b.onclick = () => { S.year = +b.dataset.y; loadYear(); });
 
   const body = $('#yearBody');
-  body.innerHTML = '<div class="empty"><span class="spin"></span>回顾中…</div>';
+  body.innerHTML = skeletonRows(4);
   const d = await api('year/' + S.year);
   const acts = d.artifacts || [];
 
@@ -466,16 +511,16 @@ async function loadYear() {
 
   body.innerHTML = `
     <div class="ystats">
-      <div class="ystat"><b>${d.files.toLocaleString()}</b><span>个文件动过</span></div>
-      <div class="ystat"><b>${d.artifact_total}</b><span>件成品</span></div>
-      <div class="ystat"><b>${(d.words / 10000).toFixed(1)}万</b><span>字（成品正文）</span></div>
-      <div class="ystat"><b>${d.projects.length}</b><span>个项目在动</span></div>
-      <div class="ystat"><b>${d.busiest_month ? d.busiest_month.slice(5) + '月' : '—'}</b><span>最忙的月份</span></div>
+      <div class="ystat" style="--i:0"><b>${d.files.toLocaleString()}</b><span>个文件动过</span></div>
+      <div class="ystat" style="--i:1"><b>${d.artifact_total}</b><span>件成品</span></div>
+      <div class="ystat" style="--i:2"><b>${(d.words / 10000).toFixed(1)}万</b><span>字（成品正文）</span></div>
+      <div class="ystat" style="--i:3"><b>${d.projects.length}</b><span>个项目在动</span></div>
+      <div class="ystat" style="--i:4"><b>${d.busiest_month ? d.busiest_month.slice(5) + '月' : '—'}</b><span>最忙的月份</span></div>
     </div>
 
     <h2 class="sec">成品分布</h2>
-    <div class="chart">${months.map(m =>
-      `<div class="bar" style="height:${Math.max(2, m.c / max * 100)}%"><b>${m.m}月 ${m.c}</b></div>`).join('')}</div>
+    <div class="chart">${months.map((m, i) =>
+      `<div class="bar" style="height:${Math.max(3, m.c / max * 100)}%;--i:${i}"><b>${m.m}月 ${m.c}</b></div>`).join('')}</div>
     <div class="chart-x">${months.map(m => `<span>${m.m}</span>`).join('')}</div>
 
     <h2 class="sec">这一年做出来的东西
@@ -819,13 +864,17 @@ async function loadStats() {
   S.stats = await api('stats');
   const s = S.stats;
   applyTheme(s.theme);
-  $('#railStats').innerHTML =
-    `<b>${s.files.toLocaleString()}</b> 个文件<br>` +
-    `<b>${s.indexed_text.toLocaleString()}</b> 份有正文<br>` +
-    `<b>${s.projects}</b> 个项目<br>` +
-    `索引 <b>${size(s.db_bytes)}</b>`;
+  $('#railStats').innerHTML = [
+    ['文件', s.files.toLocaleString()],
+    ['有正文', s.indexed_text.toLocaleString()],
+    ['项目', s.projects],
+    ['索引', size(s.db_bytes)],
+  ].map(([k, v]) => `<div class="rs-row"><span>${k}</span><b>${v}</b></div>`).join('');
 
-  const kinds = Object.entries(s.by_kind).filter(([, n]) => n > 0).slice(0, 9);
+  const kinds = KIND_ORDER
+    .filter(k => s.by_kind[k])
+    .map(k => [k, s.by_kind[k]])
+    .slice(0, 9);
   $('#kindFilters').innerHTML =
     `<button class="chip ${S.kind === '' ? 'on' : ''}" data-k="">全部</button>` +
     kinds.map(([k, n]) =>
