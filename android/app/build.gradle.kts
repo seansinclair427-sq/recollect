@@ -13,8 +13,8 @@ android {
         applicationId = "com.shiyi.archive"
         minSdk = 26          // Android 8。再往下 SAF 的树遍历行为差异太大
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     // 签名密钥不进版本库（见 .gitignore）。没有它也要能编出 release，

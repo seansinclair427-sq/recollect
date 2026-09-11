@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shiyi"
-version = "1.0.0"
-description = "拾遗 —— 把散落在硬盘里的每一件东西找回来。本地作品档案馆，零依赖。"
+version = "1.0.1"
+description = "Recollect (拾遗) — a local archive that searches the text inside your documents. Zero dependencies, offline, read-only."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
