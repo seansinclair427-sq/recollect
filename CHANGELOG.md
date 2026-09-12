@@ -5,6 +5,42 @@
 Sections: `Added` / `Changed` / `Fixed` / `Removed`. Dates are when the work was
 finished on the development machine.
 
+## 1.1.1 — 2026-09-12
+
+### Added
+- **A Windows installer.** One `recollect-1.1.1-setup.exe` you double-click. It
+  installs per-user under `%LOCALAPPDATA%\Programs`, so it never asks for
+  administrator rights, and it registers in *Settings -> Apps* like any other
+  program. The wizard offers the install location, desktop and start-menu
+  shortcuts, and start-with-Windows
+- The installer and uninstaller are drawn in the same *paper and seal* language
+  as the app itself — pure ctypes against Win32, GDI+ for antialiased shapes,
+  GDI for ClearType text. No Inno Setup and no NSIS, so building one needs
+  nothing that isn't already here
+- `--silent` for unattended setup, with `--dir`, `--no-desktop`, `--no-menu`,
+  `--autostart` and `--launch`. Exits 0, or 1 with the reason on stderr. Run
+  from a terminal it prints there, double-clicked it stays quiet
+- Uninstall lives inside the app (`拾遗.exe --uninstall`) rather than in a
+  separate uninstaller.exe that a disk cleanup can delete, leaving a program
+  that cannot be removed. It asks once whether the index should go too; say no
+  and a later reinstall picks up where you left off
+
+### Changed
+- The desktop UI layer refuses bold below 12pt. Microsoft YaHei ships no
+  Semibold, so GDI fakes one by thickening strokes — which at small sizes turns
+  dense glyphs like 删, 露 and 麟 into a solid black block. Below that size
+  hierarchy comes from size and colour instead. The rule lives in the font
+  cache, so no call site has to remember it
+- The repository root holds only what belongs there. The five Windows batch
+  files that used to sit beside the README are down to one, `tools\打包.bat`.
+  The installer creates the shortcuts and the tray menu rescans, so the scripts
+  that did those by hand had nothing left to do
+- Release assets use ASCII filenames. GitHub strips CJK characters from asset
+  names, so a Chinese one would arrive as `-1.1.1-.exe`. The installed program
+  is still called 拾遗; only the outer wrapper's filename changed
+- Android `versionCode` 4 / `versionName` 1.1.1, to keep one version number
+  across the product. The app itself is unchanged from 1.0.1
+
 ## 1.0.1 — 2026-09-11
 
 ### Added

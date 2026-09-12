@@ -41,10 +41,27 @@
 
 ## 装上它
 
-**Windows，不需要 Python**
+![安装程序](docs/desktop-setup.png)
 
-双击 `打包成exe.bat` 生成 `dist/拾遗/拾遗.exe`（约 24 MB），之后双击运行。
-整个 `dist/拾遗` 文件夹可以拷到别的电脑上直接用。
+**Windows —— 安装程序**（推荐）
+
+从 [Releases](../../releases) 下 `recollect-1.1.1-setup.exe`（约 20 MB），双击就行。
+它装在你自己的用户名下，**不需要管理员权限**，并且会像正经软件那样出现在
+「设置 → 应用」里，附带一个真的能用的卸载程序。
+
+装机器多的话，它也能不出界面：
+
+```bash
+recollect-1.1.1-setup.exe --silent --dir "D:\Tools\拾遗" --autostart
+```
+
+`--help` 列出全部开关。静默安装成功返回 0，失败返回 1 并把原因打到标准错误。
+
+**Windows —— 免安装**
+
+不想装？跑 `tools\打包.bat`（或者 `python tools/build_installer.py`），
+拿 `dist/拾遗/` 这个目录就行 —— 整个文件夹拷到哪儿都能跑，
+注册表里不留任何痕迹。
 
 **有 Python 3.10 以上**
 
@@ -53,8 +70,14 @@ pip install -e .
 shiyi                 # 启动，进托盘并打开窗口
 ```
 
-**安卓** —— 从 [Releases](../../releases) 下 `app-release.apk`（1.1 MB），
+**安卓** —— 从 [Releases](../../releases) 下 `recollect-1.1.1.apk`（1.1 MB），
 细节见 [android/README.zh-CN.md](android/README.zh-CN.md)。
+
+### 怎么卸
+
+「设置 → 应用 → 拾遗 Recollect → 卸载」，或者直接跑 `拾遗.exe --uninstall`。
+它会问一次要不要连索引一起删；不勾的话索引留着，以后重装接着用。
+你的文档自始至终不会被碰。
 
 <br>
 
@@ -243,15 +266,17 @@ Word / PowerPoint / LaTeX 导出的中文 PDF 都能读。**扫描件读不出�
 ## 开发
 
 ```bash
-python -m unittest discover -s tests   # 71 个测试
+python -m unittest discover -s tests   # 85 个测试
 python tools/make_icon.py              # 重新生成图标
-python tools/build_exe.py              # 打包（--onefile 出单文件）
+python tools/build_exe.py              # 只打程序本体（--onefile 出单文件）
+python tools/build_installer.py        # 打本体，再在外面套一层安装程序
 ```
 
 测试覆盖正文抽取、PDF 的 CMap 解析与版面还原、中文检索的两条路径、
 增量扫描与删除、版本聚簇的边界（24 个 README 不算「版本堆积」）、
 配置容错、单实例、索引维护、年鉴的 HTML 转义，以及一个真跑起来的服务端：
 无 token / 错 token / 跨源请求必须被拒，索引外的路径不许打开，目录穿越要 404。
+安装程序那部分的测试用的是一条临时注册表键，跑测试不会动到真装着的那一份。
 
 | 文件 | 干什么 |
 |---|---|
@@ -265,6 +290,8 @@ python tools/build_exe.py              # 打包（--onefile 出单文件）
 | `timeline.py` | 时间线与年鉴统计 |
 | `report.py` | 年鉴 HTML 导出 |
 | `tray.py` | Win32 托盘，纯 ctypes |
+| `winui.py` | 一层很薄的 Win32 界面：GDI+ 画形状，GDI 画字 |
+| `installer.py` | 安装与卸载向导，以及它们背后的逻辑 |
 | `window.py` | 应用窗口 |
 | `winintegration.py` | 开机自启、快捷方式、卸载 |
 

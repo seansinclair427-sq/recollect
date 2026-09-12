@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-__version__ = "1.0.1"
+__version__ = "1.1.1"
 APP_NAME = "拾遗"
 APP_NAME_EN = "Shiyi"
 

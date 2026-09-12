@@ -332,6 +332,12 @@ class Application:
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+
+    # 卸载走在最前面：它不该去抢单实例锁，也不该顺手把服务拉起来。
+    if "--uninstall" in argv:
+        from .installer import run_uninstall
+        return run_uninstall(argv)
+
     tray = "--no-tray" not in argv
     no_window = "--no-window" in argv
     port = None

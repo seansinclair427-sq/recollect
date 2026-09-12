@@ -16,7 +16,7 @@ Read-only, offline, no account.
 
 ## Install
 
-Grab `app-release.apk` (~1.1 MB) from [Releases](../../../releases), copy it to
+Grab `recollect-1.1.1.apk` (~1.1 MB) from [Releases](../../../releases), copy it to
 your phone and open it. You'll need to allow installing from unknown sources.
 
 Build it yourself:

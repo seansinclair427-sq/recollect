@@ -614,7 +614,7 @@ class TestAppShell(unittest.TestCase):
     def test_single_instance_second_acquire_fails(self):
         # 用独立名字，免得撞上真在跑的那一份
         from shiyi.app import SingleInstance
-        name = "Local\ShiyiTest_%d" % os.getpid()
+        name = r"Local\ShiyiTest_%d" % os.getpid()
         a, b = SingleInstance(name), SingleInstance(name)
         try:
             self.assertTrue(a.acquire())
@@ -716,3 +716,161 @@ class TestReport(unittest.TestCase):
         p = report.write_year(self.con, time.localtime().tm_year, str(self.tmp))
         self.assertTrue(Path(p).is_file())
         self.assertGreater(Path(p).stat().st_size, 500)
+
+
+# ───────────────────────────────────────────────────────── 安装程序
+@unittest.skipUnless(sys.platform == "win32", "安装程序只在 Windows 上存在")
+class TestInstaller(unittest.TestCase):
+    """只碰逻辑，不碰真的安装位置：注册表键换成测试专用的一条。"""
+
+    def setUp(self):
+        from shiyi import installer
+        self.I = installer
+        self.tmp = Path(tempfile.mkdtemp(prefix="shiyi-ins-"))
+        self._key = installer.UNINSTALL_KEY
+        installer.UNINSTALL_KEY = (
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall"
+            r"\ShiyiTest_%d" % os.getpid())
+
+    def tearDown(self):
+        self.I.unregister()
+        self.I.UNINSTALL_KEY = self._key
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_human_reads_like_a_person_wrote_it(self):
+        self.assertEqual(self.I.human(0), "0 B")
+        self.assertEqual(self.I.human(1024), "1 KB")
+        self.assertEqual(self.I.human(24 * 1024 * 1024), "24 MB")
+        self.assertEqual(self.I.human(3 * 1024 ** 3), "3.0 GB")
+
+    def test_default_dir_is_per_user(self):
+        d = self.I.default_dir()
+        self.assertIn("Programs", str(d))
+        self.assertTrue(str(d).endswith(self.I.APP_TITLE))
+        # 不能落在需要管理员权限的地方
+        self.assertNotIn("Program Files", str(d))
+
+    def test_payload_zip_measures_uncompressed_size(self):
+        src = self.tmp / "p.zip"
+        body = b"x" * 5000
+        with zipfile.ZipFile(src, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("拾遗.exe", body)
+            z.writestr("_internal/base.dll", body)
+        # 压缩后远小于 10000，但要报的是解开以后的大小
+        self.assertLess(src.stat().st_size, 10000)
+        self.assertEqual(self.I.payload_bytes(src), 10000)
+
+    def test_copy_payload_rebuilds_the_tree(self):
+        src = self.tmp / "p.zip"
+        with zipfile.ZipFile(src, "w") as z:
+            z.writestr("拾遗.exe", b"exe")
+            z.writestr("_internal/sub/x.dll", b"dll")
+        target = self.tmp / "out"
+        seen = []
+        self.I._copy_payload(src, target, lambda pct, note: seen.append(pct))
+        self.assertTrue((target / "拾遗.exe").is_file())
+        self.assertEqual((target / "_internal" / "sub" / "x.dll").read_bytes(),
+                         b"dll")
+        self.assertTrue(seen and 0.1 < seen[-1] <= 0.9)   # 进度在区间内
+
+    def test_register_shows_up_in_add_remove_programs(self):
+        import winreg
+        target = self.tmp / "app"
+        target.mkdir()
+        self.I.register(target, 24 * 1024 * 1024)
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            self.I.UNINSTALL_KEY) as k:
+            def val(n):
+                return winreg.QueryValueEx(k, n)[0]
+            self.assertEqual(val("DisplayName"), self.I.DISPLAY_NAME)
+            self.assertEqual(val("InstallLocation"), str(target))
+            self.assertIn("--uninstall", val("UninstallString"))
+            self.assertIn("--quiet", val("QuietUninstallString"))
+            # 大小以 KB 记，不是字节 —— 写错了「应用和功能」里会显示 24 GB
+            self.assertEqual(val("EstimatedSize"), 24 * 1024)
+        self.I.unregister()
+        with self.assertRaises(OSError):
+            winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.I.UNINSTALL_KEY)
+
+    def test_installed_dir_is_none_when_not_installed(self):
+        self.assertIsNone(self.I.installed_dir())
+        self.assertEqual(self.I.installed_version(), "")
+
+    def test_installed_dir_ignores_a_stale_registry_entry(self):
+        gone = self.tmp / "已经被手动删掉了"
+        gone.mkdir()
+        self.I.register(gone, 1)
+        gone.rmdir()
+        self.assertIsNone(self.I.installed_dir())     # 目录没了就不算装着
+
+    def test_stop_running_is_fine_with_no_runtime_file(self):
+        from shiyi import config
+        old = config.DATA_DIR
+        config.DATA_DIR = self.tmp / "nothing-here"
+        try:
+            self.assertTrue(self.I.stop_running(wait=0.1))
+        finally:
+            config.DATA_DIR = old
+
+    def test_stop_running_shrugs_off_a_dead_pid(self):
+        from shiyi import config
+        old = config.DATA_DIR
+        config.DATA_DIR = self.tmp
+        (self.tmp / "runtime.json").write_text(
+            '{"port": 1, "token": "x", "pid": 999999999}', "utf-8")
+        try:
+            self.assertTrue(self.I.stop_running(wait=0.5))
+        finally:
+            config.DATA_DIR = old
+
+    def test_deferred_delete_declines_a_missing_folder(self):
+        self.assertFalse(self.I.deferred_delete(self.tmp / "不存在"))
+        self.assertFalse(self.I.deferred_delete(None))
+
+    def test_writable_says_no_to_a_place_that_isnt_there(self):
+        self.assertTrue(self.I.writable(self.tmp / "新建的"))
+        # 找一个真没挂的盘符，别写死 Z: —— 万一 CI 上恰好映射了就假失败
+        free = next((c for c in "ZYXWV" if not Path(c + ":/").exists()), None)
+        if free is None:
+            self.skipTest("这台机器盘符都占满了")
+        self.assertFalse(self.I.writable(Path(free + ":/没有这个盘/x")))
+
+    def test_silent_help_lists_every_flag_it_accepts(self):
+        for flag in ("--silent", "--dir", "--no-desktop", "--no-menu",
+                     "--autostart", "--launch"):
+            self.assertIn(flag, self.I.SILENT_HELP)
+
+    def test_install_refuses_a_place_it_cannot_write(self):
+        free = next((c for c in "QZYXW" if not Path(c + ":/").exists()), None)
+        if free is None:
+            self.skipTest("这台机器盘符都占满了")
+        with self.assertRaises(RuntimeError) as cm:
+            self.I.do_install(Path(free + ":/没有这个盘/拾遗"), False, False,
+                              False, lambda *_: None)
+        # 要说人话，不是把 WinError 原样丢出来
+        self.assertIn("写不进", str(cm.exception))
+
+    def test_console_write_reports_whether_it_got_through(self):
+        # 关键是它在任何情形下都不许抛，也不许挂着等人点对话框
+        self.assertIsInstance(self.I.console_write("测试\n"), bool)
+        self.assertIsInstance(self.I.console_write("测试\n", err=True), bool)
+
+
+@unittest.skipUnless(sys.platform == "win32", "winui 只在 Windows 上有意义")
+class TestWinUi(unittest.TestCase):
+    def test_colour_helpers(self):
+        from shiyi import winui
+        # COLORREF 是 0x00BBGGRR，跟 CSS 的 0xRRGGBB 反着来
+        self.assertEqual(winui._rgb(0xB4451F), 0x1F45B4)
+        self.assertEqual(winui._argb(0xB4451F), 0xFFB4451F)
+        self.assertEqual(winui.mix(0x000000, 0xFFFFFF, 0.5), 0x808080)
+        self.assertEqual(winui.mix(0xB4451F, 0xB4451F, 0.7), 0xB4451F)
+
+    def test_palette_matches_the_stylesheet(self):
+        """朱砂和纸色必须跟 web/app.css 里是同一个值，不然两边会对不上。"""
+        from shiyi import winui, web_dir
+        css = (web_dir() / "app.css").read_text("utf-8")
+        for token, value in (("--seal:", winui.SEAL), ("--paper:", winui.PAPER),
+                             ("--ink:", winui.INK), ("--line:", winui.LINE)):
+            want = "%s#%06x" % (token, value)
+            self.assertIn(want, css.replace(" ", ""))

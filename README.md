@@ -41,10 +41,30 @@ It **never deletes anything**. It lays out the facts; what to remove is your cal
 
 ## Install
 
-**Windows, no Python required**
+![Installer](docs/desktop-setup.png)
 
-Double-click `打包成exe.bat` to produce `dist/拾遗/拾遗.exe` (~24 MB), then run it.
-The whole `dist/拾遗` folder is portable — copy it to another machine and it works.
+**Windows — installer** (recommended)
+
+Download `recollect-1.1.1-setup.exe` (~20 MB) from [Releases](../../releases) and
+double-click it. It installs under your own user account, so it never asks for
+administrator rights, and it registers in *Settings → Apps* like any other
+program — with an uninstaller that actually works.
+
+For unattended setup it also runs without a UI:
+
+```bash
+recollect-1.1.1-setup.exe --silent --dir "D:\Tools\拾遗" --autostart
+```
+
+`--help` lists every flag. A silent install exits 0, or 1 with the reason on
+stderr.
+
+**Windows — portable**
+
+Don't want an installer? Run `tools\打包.bat` (or
+`python tools/build_installer.py`) and take `dist/拾遗/` instead — the whole
+folder is portable, copy it anywhere and it runs, leaving no registry entry
+behind.
 
 **With Python 3.10+**
 
@@ -53,8 +73,14 @@ pip install -e .
 shiyi                 # starts in the tray, opens a window
 ```
 
-**Android** — grab `app-release.apk` (1.1 MB) from
+**Android** — grab `recollect-1.1.1.apk` (1.1 MB) from
 [Releases](../../releases), or see [android/README.md](android/README.md).
+
+### Uninstalling
+
+*Settings → Apps → 拾遗 Recollect → Uninstall*, or run `拾遗.exe --uninstall`.
+It asks once whether to delete the index too; leave it unchecked and a later
+reinstall picks up exactly where you left off. Your documents are never touched.
 
 <br>
 
@@ -260,9 +286,10 @@ Then read `~/.shiyi/shiyi.log` (also visible under About → Logs).
 ## Development
 
 ```bash
-python -m unittest discover -s tests   # 71 tests
+python -m unittest discover -s tests   # 85 tests
 python tools/make_icon.py              # regenerate the icon
-python tools/build_exe.py              # package (--onefile for a single exe)
+python tools/build_exe.py              # the app alone (--onefile for one exe)
+python tools/build_installer.py        # the app, then the installer around it
 ```
 
 Tests cover text extraction, PDF CMap parsing and layout reconstruction, both
@@ -270,7 +297,9 @@ Chinese search paths, incremental scan and deletion, the edges of version
 clustering (24 READMEs are not a "version pile-up"), config tolerance, single
 instance, index maintenance, yearbook HTML escaping — plus a real running
 server: missing/wrong token and cross-origin requests must be rejected, paths
-outside the index must not open, and directory traversal must 404.
+outside the index must not open, and directory traversal must 404. The
+installer's own tests use a throwaway registry key, so running them never
+disturbs a real installation.
 
 | File | Role |
 |---|---|
@@ -284,6 +313,8 @@ outside the index must not open, and directory traversal must 404.
 | `timeline.py` | Timeline and yearbook statistics |
 | `report.py` | Yearbook HTML export |
 | `tray.py` | Win32 tray icon, pure ctypes |
+| `winui.py` | A thin Win32 UI layer: GDI+ for shapes, GDI for text |
+| `installer.py` | The install and uninstall wizards, and their logic |
 | `window.py` | Application window |
 | `winintegration.py` | Autostart, shortcuts, uninstall |
 

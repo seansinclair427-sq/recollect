@@ -15,7 +15,7 @@
 
 ## 装上它
 
-从 [Releases](../../../releases) 下 `app-release.apk`（约 1.1 MB），
+从 [Releases](../../../releases) 下 `recollect-1.1.1.apk`（约 1.1 MB），
 传到手机点开安装即可（需要允许「安装未知来源应用」）。
 
 自己编译：
